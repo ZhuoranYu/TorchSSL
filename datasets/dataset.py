@@ -82,7 +82,7 @@ class BasicDataset(Dataset):
                 return idx, img_w, target
             else:
                 if self.alg == 'fixmatch':
-                    return idx, img_w, self.strong_transform(img)
+                    return idx, img_w, self.strong_transform(img), target
                 elif self.alg == 'flexmatch':
                     return idx, img_w, self.strong_transform(img)
                 elif self.alg == 'pimodel':
