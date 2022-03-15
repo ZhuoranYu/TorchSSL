@@ -12,7 +12,7 @@ import os
 import contextlib
 from train_utils import AverageMeter
 
-from .fixmatch_utils import consistency_loss, Get_Scalar
+from .energymatch_utils import consistency_loss, Get_Scalar
 from train_utils import ce_loss, wd_loss, EMA, Bn_Controller
 from analyze_utils import *
 
@@ -20,7 +20,7 @@ from sklearn.metrics import *
 from copy import deepcopy
 
 
-class FixMatch:
+class EnergyMatch:
     def __init__(self, net_builder, num_classes, ema_m, T, p_cutoff, lambda_u, \
                  hard_label=True, t_fn=None, p_fn=None, it=0, num_eval_iter=1000, tb_log=None, logger=None):
         """
@@ -39,7 +39,7 @@ class FixMatch:
             logger: logger (see utils.py)
         """
 
-        super(FixMatch, self).__init__()
+        super(EnergyMatch, self).__init__()
 
         # momentum update param
         self.loader = {}
@@ -243,7 +243,12 @@ class FixMatch:
                 unsup_loss, mask, select, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
                                                                        logits_x_ulb_w,
                                                                        'ce', T, p_cutoff,
-                                                                       use_hard_labels=args.hard_label)
+                                                                       use_hard_labels=args.hard_label,
+                                                                       x1=args.x1,
+                                                                       y1=args.y1,
+                                                                       x2=args.x2,
+                                                                       y2=args.y2,
+                                                                       degree=args.degree)
 
                 total_loss = sup_loss + self.lambda_u * unsup_loss
 
