@@ -293,15 +293,17 @@ class FixMatch:
                         (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
                     self.save_model('latest_model.pth', save_path)
 
-            if self.it % self.num_eval_iter == 0:
-                eval_dict = self.evaluate(args=args)
-                tb_dict.update(eval_dict)
-
+            if self.it % 100 == 0:
                 self.save_energy_real(scores_ulb, label_ulb, energy_ulb)
                 self.save_energy_pseudo(scores_ulb, label_ulb, energy_ulb)
                 scores_ulb = []
                 label_ulb = []
                 energy_ulb = []
+
+
+            if self.it % self.num_eval_iter == 0:
+                eval_dict = self.evaluate(args=args)
+                tb_dict.update(eval_dict)
 
                 pr_dict, ratio_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes)
                 tb_dict.update(pr_dict)
