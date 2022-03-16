@@ -200,9 +200,8 @@ class EnergyMatch:
         true_labels_acc = []
         all_true_labels_acc = []
 
-        scores_ulb = []
-        label_ulb = []
-        energy_ulb = []
+        pseudo_labels_energy = []
+        true_labels_energy = []
 
         for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s, y_ulb) in zip(self.loader_dict['train_lb'],
                                                                   self.loader_dict['train_ulb']):
@@ -255,6 +254,12 @@ class EnergyMatch:
                 pseudo_labels_acc.append(pseudo_lb[mask_raw])
                 true_labels_acc.append(y_ulb[mask_raw])
                 all_true_labels_acc.append(y_ulb)
+
+                energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
+                energy_mask = energy < -7.5
+                pseudo_labels_energy.append(pseudo_lb[energy_mask])
+                true_labels_energy.append(y_ulb[energy_mask])
+
 
                 # energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
                 # scores_ulb.append(F.softmax(logits_x_ulb_w, dim=-1).detach())
@@ -310,10 +315,15 @@ class EnergyMatch:
                 eval_dict = self.evaluate(args=args)
                 tb_dict.update(eval_dict)
 
-                pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes)
+                pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes, name='confidence')
+                pr_dict_energy = analyze_pseudo(pseudo_labels_energy, true_labels_energy, all_true_labels_acc, self.num_classes, name='energy')
+
                 tb_dict.update(pr_dict)
+                tb_dict.update(pr_dict_energy)
                 pseudo_labels_acc = []
+                pseudo_labels_energy = []
                 true_labels_acc = []
+                true_labels_energy = []
                 all_true_labels_acc = []
 
                 save_path = os.path.join(args.save_dir, args.save_name)

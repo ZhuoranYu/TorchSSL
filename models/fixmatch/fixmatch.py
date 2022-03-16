@@ -110,7 +110,7 @@ class FixMatch:
         data = np.vstack([max_score.detach().cpu().numpy(), energy_ulb.detach().cpu().numpy(),
                           pred_column.detach().cpu().numpy().astype(np.float)]).transpose()
         df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-        os.makedirs('stats', exist_ok=True)
+        os.makedirs('temp', exist_ok=True)
         df.to_csv('stats/overall_pseudo.csv', index=False)
         for c in range(self.num_classes):
             c_mask = max_index == c
@@ -150,7 +150,7 @@ class FixMatch:
         # from real label's perspective
         data = np.vstack([max_score.detach().cpu().numpy(), energy_ulb.detach().cpu().numpy(), pred_column.detach().cpu().numpy().astype(np.float)]).transpose()
         df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-        os.makedirs('stats', exist_ok=True)
+        os.makedirs('temp', exist_ok=True)
         df.to_csv('stats/overall_real.csv', index=False)
         for c in range(self.num_classes):
             c_mask = label_ulb == c
@@ -199,6 +199,9 @@ class FixMatch:
         pseudo_labels_acc = []
         true_labels_acc = []
         all_true_labels_acc = []
+
+        pseudo_labels_energy = []
+        true_labels_energy = []
 
         scores_ulb = []
         label_ulb = []
@@ -251,10 +254,15 @@ class FixMatch:
                 true_labels_acc.append(y_ulb[mask_raw])
                 all_true_labels_acc.append(y_ulb)
 
-                # energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
-                # scores_ulb.append(F.softmax(logits_x_ulb_w, dim=-1).detach())
-                # label_ulb.append(y_ulb)
-                # energy_ulb.append(energy)
+                energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
+                energy_mask = energy < -7.5
+                pseudo_labels_energy.append(pseudo_lb[energy_mask])
+                true_labels_energy.append(y_ulb[energy_mask])
+
+                energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
+                scores_ulb.append(F.softmax(logits_x_ulb_w, dim=-1).detach())
+                label_ulb.append(y_ulb)
+                energy_ulb.append(energy)
 
             # parameter updates
             if args.amp:
@@ -293,22 +301,28 @@ class FixMatch:
                         (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
                     self.save_model('latest_model.pth', save_path)
 
-            # if self.it % 100 == 0:
-            #     self.save_energy_real(scores_ulb, label_ulb, energy_ulb)
-            #     self.save_energy_pseudo(scores_ulb, label_ulb, energy_ulb)
-            #     scores_ulb = []
-            #     label_ulb = []
-            #     energy_ulb = []
+            if self.it % 100 == 0:
+                self.save_energy_real(scores_ulb, label_ulb, energy_ulb)
+                self.save_energy_pseudo(scores_ulb, label_ulb, energy_ulb)
+                scores_ulb = []
+                label_ulb = []
+                energy_ulb = []
+                self.print_fn("Saved")
 
 
             if self.it % self.num_eval_iter == 0:
                 eval_dict = self.evaluate(args=args)
                 tb_dict.update(eval_dict)
 
-                pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes)
+                pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes, name='confidence')
+                pr_dict_energy = analyze_pseudo(pseudo_labels_energy, true_labels_energy, all_true_labels_acc, self.num_classes, name='energy')
+
                 tb_dict.update(pr_dict)
+                tb_dict.update(pr_dict_energy)
                 pseudo_labels_acc = []
+                pseudo_labels_energy = []
                 true_labels_acc = []
+                true_labels_energy = []
                 all_true_labels_acc = []
 
                 save_path = os.path.join(args.save_dir, args.save_name)
