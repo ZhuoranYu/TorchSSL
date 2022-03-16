@@ -26,7 +26,7 @@ def consistency_loss(logits_s, logits_w, name='ce', T=1.0, p_cutoff=0.0, use_har
     assert name in ['ce', 'L2']
     logits_w = logits_w.detach()
 
-    alpha, beta = interpolation(kwargs['x1'], kwargs['y1'], kwargs['x2'], kwargs['y2'], kwargs['degree'])
+    #alpha, beta = interpolation(kwargs['x1'], kwargs['y1'], kwargs['x2'], kwargs['y2'], kwargs['degree'])
 
     if name == 'L2':
         assert logits_w.size() == logits_s.size()
@@ -41,8 +41,8 @@ def consistency_loss(logits_s, logits_w, name='ce', T=1.0, p_cutoff=0.0, use_har
 
         max_probs, max_idx = torch.max(pseudo_label, dim=-1)
 
-        boundary = alpha * torch.exp(beta * (max_probs ** kwargs['degree']))
-        mask_raw = energy < boundary
+        #boundary = alpha * torch.exp(beta * (max_probs ** kwargs['degree']))
+        mask_raw = energy < -7.5
         mask = mask_raw.float()
         select = max_probs.ge(p_cutoff).long()
 
