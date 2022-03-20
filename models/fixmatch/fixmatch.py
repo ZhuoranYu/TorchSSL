@@ -111,7 +111,7 @@ class FixMatch:
                           pred_column.detach().cpu().numpy().astype(np.float)]).transpose()
         df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
         os.makedirs('temp', exist_ok=True)
-        df.to_csv('stats/overall_pseudo.csv', index=False)
+        df.to_csv('temp/overall_pseudo.csv', index=False)
         for c in range(self.num_classes):
             c_mask = max_index == c
             c_score = max_score[c_mask].detach().cpu().numpy()
@@ -120,8 +120,8 @@ class FixMatch:
 
             data = np.vstack([c_score, c_energy, c_pred_column]).transpose()
             df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-            os.makedirs('stats', exist_ok=True)
-            df.to_csv(f'stats/class_{c}_pseudo.csv', index=False)
+            os.makedirs('temp', exist_ok=True)
+            df.to_csv(f'temp/class_{c}_pseudo.csv', index=False)
 
 
     def save_energy_real(self, scores_ulb, label_ulb, energy_ulb):
@@ -151,7 +151,7 @@ class FixMatch:
         data = np.vstack([max_score.detach().cpu().numpy(), energy_ulb.detach().cpu().numpy(), pred_column.detach().cpu().numpy().astype(np.float)]).transpose()
         df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
         os.makedirs('temp', exist_ok=True)
-        df.to_csv('stats/overall_real.csv', index=False)
+        df.to_csv('temp/overall_real.csv', index=False)
         for c in range(self.num_classes):
             c_mask = label_ulb == c
             c_score = max_score[c_mask].detach().cpu().numpy()
@@ -160,8 +160,8 @@ class FixMatch:
 
             data = np.vstack([c_score, c_energy, c_pred_column]).transpose()
             df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-            os.makedirs('stats', exist_ok=True)
-            df.to_csv(f'stats/class_{c}_real.csv', index=False)
+            os.makedirs('temp', exist_ok=True)
+            df.to_csv(f'temp/class_{c}_real.csv', index=False)
 
     def train(self, args, logger=None):
 
@@ -248,14 +248,14 @@ class FixMatch:
                                                                        'ce', T, p_cutoff,
                                                                        use_hard_labels=args.hard_label)
 
-                total_loss = sup_loss + self.lambda_u * unsup_loss
+                total_loss = sup_loss + self.lambda_u * unsup_loss * 0
 
                 pseudo_labels_acc.append(pseudo_lb[mask_raw])
                 true_labels_acc.append(y_ulb[mask_raw])
                 all_true_labels_acc.append(y_ulb)
 
                 energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
-                energy_mask = energy < -7.5
+                energy_mask = energy < -10
                 pseudo_labels_energy.append(pseudo_lb[energy_mask])
                 true_labels_energy.append(y_ulb[energy_mask])
 
