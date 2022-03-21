@@ -248,7 +248,7 @@ class FixMatch:
                                                                        'ce', T, p_cutoff,
                                                                        use_hard_labels=args.hard_label)
 
-                total_loss = sup_loss + self.lambda_u * unsup_loss * 0
+                total_loss = sup_loss + self.lambda_u * unsup_loss
 
                 pseudo_labels_acc.append(pseudo_lb[mask_raw])
                 true_labels_acc.append(y_ulb[mask_raw])
@@ -259,10 +259,10 @@ class FixMatch:
                 pseudo_labels_energy.append(pseudo_lb[energy_mask])
                 true_labels_energy.append(y_ulb[energy_mask])
 
-                energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
-                scores_ulb.append(F.softmax(logits_x_ulb_w, dim=-1).detach())
-                label_ulb.append(y_ulb)
-                energy_ulb.append(energy)
+                # energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
+                # scores_ulb.append(F.softmax(logits_x_ulb_w, dim=-1).detach())
+                # label_ulb.append(y_ulb)
+                # energy_ulb.append(energy)
 
             # parameter updates
             if args.amp:
@@ -301,13 +301,13 @@ class FixMatch:
                         (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
                     self.save_model('latest_model.pth', save_path)
 
-            if self.it % 100 == 0:
-                self.save_energy_real(scores_ulb, label_ulb, energy_ulb)
-                self.save_energy_pseudo(scores_ulb, label_ulb, energy_ulb)
-                scores_ulb = []
-                label_ulb = []
-                energy_ulb = []
-                self.print_fn("Saved")
+            #if self.it % 50 == 0:
+            #    self.save_energy_real(scores_ulb, label_ulb, energy_ulb)
+            #    self.save_energy_pseudo(scores_ulb, label_ulb, energy_ulb)
+            #    scores_ulb = []
+            #    label_ulb = []
+            #    energy_ulb = []
+            #    self.print_fn("Saved")
 
 
             if self.it % self.num_eval_iter == 0:
