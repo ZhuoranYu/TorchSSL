@@ -1,6 +1,6 @@
 import torch
 
-from .data_utils import split_ssl_data, sample_labeled_data
+from .data_utils import split_ssl_data, sample_labeled_data, split_ssl_data_lt
 from .dataset import BasicDataset
 from collections import Counter
 import torchvision
@@ -308,9 +308,24 @@ class SSL_Dataset:
             ulb_targets = None
         else:
             data, targets = self.get_data()
-            lb_data, lb_targets, ulb_data, ulb_targets = split_ssl_data(self.args, data, targets,
+
+            if self.args.long_tail:
+                lb_data, lb_targets, ulb_data, ulb_targets = split_ssl_data_lt(self.args, data, targets,
+                                                                               self.num_classes)
+            else:
+                lb_data, lb_targets, ulb_data, ulb_targets = split_ssl_data(self.args, data, targets,
                                                                         num_labels, self.num_classes,
                                                                         index, include_lb_to_ulb)
+
+
+        lb_count = [0 for _ in range(self.num_classes)]
+        ulb_count = [0 for _ in range(self.num_classes)]
+        for c in range(self.num_classes):
+            lb_count[c] += np.count_nonzero(np.array(lb_targets) == c)
+            ulb_count[c] += np.count_nonzero(np.array(ulb_targets) == c)
+        print("Labeled Class Frequency: ", lb_count)
+        print("Unlabeled Class Frequency: ", ulb_count)
+
         # output the distribution of labeled data for remixmatch
         count = [0 for _ in range(self.num_classes)]
         for c in lb_targets:

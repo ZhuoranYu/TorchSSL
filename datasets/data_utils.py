@@ -10,6 +10,16 @@ import os
 
 from datasets.DistributedProxySampler import DistributedProxySampler
 
+def split_ssl_data_lt(args, data, target, num_classes):
+    '''
+        split data into labeled and unlabeled in the long-tail scenario
+        '''
+    # create the long-tailed data as a whole
+    data, target = np.array(data), np.array(target)
+    lb_data, lb_targets, ulb_data, ulb_targets = sample_long_tail_data(args.imb_ratio_lb, args.imb_ratio_ulb, num_classes,
+                                                                args.labeled_percentage, data, target)
+    return lb_data, lb_targets, ulb_data, ulb_targets
+
 
 def split_ssl_data(args, data, target, num_labels, num_classes, index=None, include_lb_to_ulb=True):
     """
@@ -26,6 +36,41 @@ def split_ssl_data(args, data, target, num_labels, num_classes, index=None, incl
         return lb_data, lbs, data, target
     else:
         return lb_data, lbs, data[ulb_idx], target[ulb_idx]
+
+
+def sample_long_tail_data(imb_ratio_lb, imb_ratio_ulb, num_classes, labeled_percentage, data, target):
+    # create a label to index mapping
+    '''
+    samples for labeled data
+    (sampling with balanced ratio over classes)
+    '''
+
+    sample_per_class_percentage_lb = []
+    sample_per_class_percentage_ulb = []
+    for cls_idx in range(num_classes):
+        num_lb = (1.0 / imb_ratio_lb) ** (cls_idx / (num_classes - 1.0))
+        sample_per_class_percentage_lb.append(num_lb)
+
+        num_ulb = (1.0 / imb_ratio_ulb) ** (cls_idx / (num_classes - 1.0))
+        sample_per_class_percentage_ulb.append(num_ulb)
+
+    lb_data = []
+    lb_targets = []
+    ulb_data = []
+    ulb_targets = []
+    for c in range(num_classes):
+        idx = np.where(target == c)[0]
+        lb_num_samples = int(idx.shape[0] * sample_per_class_percentage_lb[c] * (labeled_percentage / 100.0))
+        ulb_num_samples = int((idx.shape[0] - lb_num_samples) * sample_per_class_percentage_ulb[c])
+        lb_idx = np.random.choice(idx, lb_num_samples, False)
+        ulb_idx = np.random.choice(idx, ulb_num_samples, False)
+
+        lb_data.extend(data[lb_idx])
+        lb_targets.extend(target[lb_idx])
+        ulb_data.extend(data[ulb_idx])
+        ulb_targets.extend(target[ulb_idx])
+
+    return lb_data, lb_targets, ulb_data, ulb_targets
 
 
 def sample_labeled_data(args, data, target,
