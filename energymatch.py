@@ -138,6 +138,7 @@ def main_worker(gpu, ngpus_per_node, args):
     optimizer = get_optimizer(model.model, args.optim, args.lr, args.momentum, args.weight_decay)
     scheduler = get_cosine_schedule_with_warmup(optimizer,
                                                 args.num_train_iter,
+                                                num_cycles=args.cycle / 16.,
                                                 num_warmup_steps=args.num_train_iter * 0)
     ## set SGD and cosine lr on FixMatch
     model.set_optimizer(optimizer, scheduler)
@@ -301,6 +302,7 @@ if __name__ == "__main__":
     parser.add_argument('--weight_decay', type=float, default=5e-4)
     parser.add_argument('--amp', type=str2bool, default=False, help='use mixed precision training or not')
     parser.add_argument('--clip', type=float, default=0)
+    parser.add_argument('--cycle', type=float, default=7.)
     '''
     Backbone Net Configurations
     '''
