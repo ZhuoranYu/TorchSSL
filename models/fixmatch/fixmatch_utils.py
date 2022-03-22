@@ -6,10 +6,10 @@ from train_utils import ce_loss
 class Get_Scalar:
     def __init__(self, value):
         self.value = value
-        
+
     def get_value(self, iter):
         return self.value
-    
+
     def __call__(self, iter):
         return self.value
 
@@ -27,8 +27,7 @@ def consistency_loss(logits_s, logits_w, name='ce', T=1.0, p_cutoff=0.0, use_har
     elif name == 'ce':
         pseudo_label = torch.softmax(logits_w, dim=-1)
         max_probs, max_idx = torch.max(pseudo_label, dim=-1)
-        mask_raw = max_probs.ge(p_cutoff)
-        mask = mask_raw.float()
+        mask = max_probs.ge(p_cutoff).float()
         select = max_probs.ge(p_cutoff).long()
         # strong_prob, strong_idx = torch.max(torch.softmax(logits_s, dim=-1), dim=-1)
         # strong_select = strong_prob.ge(p_cutoff).long()
@@ -38,8 +37,7 @@ def consistency_loss(logits_s, logits_w, name='ce', T=1.0, p_cutoff=0.0, use_har
         else:
             pseudo_label = torch.softmax(logits_w / T, dim=-1)
             masked_loss = ce_loss(logits_s, pseudo_label, use_hard_labels) * mask
-        return masked_loss.mean(), mask.mean(), select, max_idx.long(), mask_raw
+        return masked_loss.mean(), mask.mean(), select, max_idx.long()
 
     else:
         assert Exception('Not Implemented consistency_loss')
-            
