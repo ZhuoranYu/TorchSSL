@@ -42,7 +42,7 @@ def consistency_loss(logits_s, logits_w, name='ce', T=1.0, p_cutoff=0.0, use_har
         max_probs, max_idx = torch.max(pseudo_label, dim=-1)
 
         #boundary = alpha * torch.exp(beta * (max_probs ** kwargs['degree']))
-        mask_raw = energy < -7.5
+        mask_raw = energy < -8.75
         mask = mask_raw.float()
         select = max_probs.ge(p_cutoff).long()
 

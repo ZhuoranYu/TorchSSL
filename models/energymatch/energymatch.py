@@ -110,8 +110,8 @@ class EnergyMatch:
         data = np.vstack([max_score.detach().cpu().numpy(), energy_ulb.detach().cpu().numpy(),
                           pred_column.detach().cpu().numpy().astype(np.float)]).transpose()
         df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-        os.makedirs('stats', exist_ok=True)
-        df.to_csv('stats/overall_pseudo.csv', index=False)
+        os.makedirs('temp', exist_ok=True)
+        df.to_csv('temp/overall_pseudo.csv', index=False)
         for c in range(self.num_classes):
             c_mask = max_index == c
             c_score = max_score[c_mask].detach().cpu().numpy()
@@ -120,8 +120,8 @@ class EnergyMatch:
 
             data = np.vstack([c_score, c_energy, c_pred_column]).transpose()
             df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-            os.makedirs('stats', exist_ok=True)
-            df.to_csv(f'stats/class_{c}_pseudo.csv', index=False)
+            os.makedirs('temp', exist_ok=True)
+            df.to_csv(f'temp/class_{c}_pseudo.csv', index=False)
 
 
     def save_energy_real(self, scores_ulb, label_ulb, energy_ulb):
@@ -150,8 +150,8 @@ class EnergyMatch:
         # from real label's perspective
         data = np.vstack([max_score.detach().cpu().numpy(), energy_ulb.detach().cpu().numpy(), pred_column.detach().cpu().numpy().astype(np.float)]).transpose()
         df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-        os.makedirs('stats', exist_ok=True)
-        df.to_csv('stats/overall_real.csv', index=False)
+        os.makedirs('temp', exist_ok=True)
+        df.to_csv('temp/overall_real.csv', index=False)
         for c in range(self.num_classes):
             c_mask = label_ulb == c
             c_score = max_score[c_mask].detach().cpu().numpy()
@@ -160,8 +160,8 @@ class EnergyMatch:
 
             data = np.vstack([c_score, c_energy, c_pred_column]).transpose()
             df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-            os.makedirs('stats', exist_ok=True)
-            df.to_csv(f'stats/class_{c}_real.csv', index=False)
+            os.makedirs('temp', exist_ok=True)
+            df.to_csv(f'temp/class_{c}_real.csv', index=False)
 
     def train(self, args, logger=None):
 
@@ -202,6 +202,10 @@ class EnergyMatch:
 
         pseudo_labels_energy = []
         true_labels_energy = []
+
+        scores_ulb = []
+        label_ulb = []
+        energy_ulb = []
 
         for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s, y_ulb) in zip(self.loader_dict['train_lb'],
                                                                   self.loader_dict['train_ulb']):
@@ -251,15 +255,15 @@ class EnergyMatch:
                 all_true_labels_acc.append(y_ulb)
 
                 energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
-                energy_mask = energy < -7.5
+                energy_mask = energy < -8.75
                 pseudo_labels_energy.append(pseudo_lb[energy_mask])
                 true_labels_energy.append(y_ulb[energy_mask])
 
 
-                # energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
-                # scores_ulb.append(F.softmax(logits_x_ulb_w, dim=-1).detach())
-                # label_ulb.append(y_ulb)
-                # energy_ulb.append(energy)
+                #energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
+                #scores_ulb.append(F.softmax(logits_x_ulb_w, dim=-1).detach())
+                #label_ulb.append(y_ulb)
+                #energy_ulb.append(energy)
 
             # parameter updates
             if args.amp:
@@ -299,11 +303,11 @@ class EnergyMatch:
                     self.save_model('latest_model.pth', save_path)
 
             # if self.it % 100 == 0:
-            #     self.save_energy_real(scores_ulb, label_ulb, energy_ulb)
-            #     self.save_energy_pseudo(scores_ulb, label_ulb, energy_ulb)
-            #     scores_ulb = []
-            #     label_ulb = []
-            #     energy_ulb = []
+            #    self.save_energy_real(scores_ulb, label_ulb, energy_ulb)
+            #    self.save_energy_pseudo(scores_ulb, label_ulb, energy_ulb)
+            #    scores_ulb = []
+            #    label_ulb = []
+            #    energy_ulb = []
 
 
             if self.it % self.num_eval_iter == 0:
