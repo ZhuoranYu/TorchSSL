@@ -340,6 +340,16 @@ if __name__ == "__main__":
                              'N processes per node, which has N GPUs. This is the '
                              'fastest way to use PyTorch for either single node or '
                              'multi node data parallel training')
+
+    '''
+    long-tail hyper-parameters
+    '''
+    parser.add_argument('--long_tail', type=bool, default=False)
+    parser.add_argument('--imb_ratio_lb', type=int, default=100)
+    parser.add_argument('--imb_ratio_ulb', type=int, default=100)
+    parser.add_argument('--labeled_percentage', type=float, default=10)
+
+
     # config file
     parser.add_argument('--c', type=str, default='')
 
