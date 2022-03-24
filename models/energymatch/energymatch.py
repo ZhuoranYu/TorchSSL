@@ -232,9 +232,13 @@ class EnergyMatch:
                 logits_x_ulb_w, logits_x_ulb_s = logits[num_lb:].chunk(2)
                 sup_loss = ce_loss(logits_x_lb, y_lb, reduction='mean')
 
+                T = self.t_fn(self.it)
+                p_cutoff = self.p_fn(self.it)
+
                 unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
                                                                        logits_x_ulb_w,
-                                                                       'ce', args.e_cutoff,
+                                                                       'ce', p_cutoff, args.e_cutoff,
+                                                                       joint_conf=args.joint_conf,
                                                                        use_hard_labels=args.hard_label)
 
 

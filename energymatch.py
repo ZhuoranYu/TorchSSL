@@ -361,6 +361,7 @@ if __name__ == "__main__":
     parser.add_argument('--degree', default=10, type=int)
 
     parser.add_argument('--e_cutoff', default=-8.75, type=int)
+    parser.add_argument('--joint_conf', default=False, type=bool)
 
     # config file
     parser.add_argument('--c', type=str, default='')

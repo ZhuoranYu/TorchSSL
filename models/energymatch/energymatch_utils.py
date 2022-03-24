@@ -22,7 +22,7 @@ def interpolation(x1, y1, x2, y2, k):
     return alpha, beta
 
 
-def consistency_loss(logits_s, logits_w, name='ce', e_cutoff=-8.75, use_hard_labels=True, **kwargs):
+def consistency_loss(logits_s, logits_w, name='ce', p_cutoff=0.95, e_cutoff=-8.75, joint_conf=False, use_hard_labels=True, **kwargs):
     assert name in ['ce', 'L2']
     logits_w = logits_w.detach()
 
@@ -43,6 +43,9 @@ def consistency_loss(logits_s, logits_w, name='ce', e_cutoff=-8.75, use_hard_lab
 
         #boundary = alpha * torch.exp(beta * (max_probs ** kwargs['degree']))
         mask_raw = energy < e_cutoff
+
+        if joint_conf:
+            mask_raw = torch.logical_and(mask_raw, max_probs > p_cutoff)
         mask = mask_raw.float()
         select = max_probs[mask_raw]
 
