@@ -200,13 +200,6 @@ class EnergyMatch:
         true_labels_acc = []
         all_true_labels_acc = []
 
-        pseudo_labels_energy = []
-        true_labels_energy = []
-
-        scores_ulb = []
-        label_ulb = []
-        energy_ulb = []
-
         for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s, y_ulb) in zip(self.loader_dict['train_lb'],
                                                                   self.loader_dict['train_ulb']):
 
@@ -239,31 +232,17 @@ class EnergyMatch:
                 logits_x_ulb_w, logits_x_ulb_s = logits[num_lb:].chunk(2)
                 sup_loss = ce_loss(logits_x_lb, y_lb, reduction='mean')
 
-                # hyper-params for update
-                T = self.t_fn(self.it)
-                p_cutoff = self.p_fn(self.it)
-
-                unsup_loss, mask, select, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
+                unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
                                                                        logits_x_ulb_w,
-                                                                       'ce', T, p_cutoff,
+                                                                       'ce', args.e_cutoff,
                                                                        use_hard_labels=args.hard_label)
+
 
                 total_loss = sup_loss + self.lambda_u * unsup_loss
 
                 pseudo_labels_acc.append(pseudo_lb[mask_raw])
                 true_labels_acc.append(y_ulb[mask_raw])
                 all_true_labels_acc.append(y_ulb)
-
-                energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
-                energy_mask = energy < -8.75
-                pseudo_labels_energy.append(pseudo_lb[energy_mask])
-                true_labels_energy.append(y_ulb[energy_mask])
-
-
-                #energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
-                #scores_ulb.append(F.softmax(logits_x_ulb_w, dim=-1).detach())
-                #label_ulb.append(y_ulb)
-                #energy_ulb.append(energy)
 
             # parameter updates
             if args.amp:
@@ -302,27 +281,19 @@ class EnergyMatch:
                         (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
                     self.save_model('latest_model.pth', save_path)
 
-            # if self.it % 100 == 0:
-            #    self.save_energy_real(scores_ulb, label_ulb, energy_ulb)
-            #    self.save_energy_pseudo(scores_ulb, label_ulb, energy_ulb)
-            #    scores_ulb = []
-            #    label_ulb = []
-            #    energy_ulb = []
-
 
             if self.it % self.num_eval_iter == 0:
+                prob_prec_dict = analyze_prob(select_scores, pseudo_lb[mask_raw], y_ulb[mask_raw])
+                tb_dict.update(prob_prec_dict)
+
                 eval_dict = self.evaluate(args=args)
                 tb_dict.update(eval_dict)
 
-                pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes, name='confidence')
-                pr_dict_energy = analyze_pseudo(pseudo_labels_energy, true_labels_energy, all_true_labels_acc, self.num_classes, name='energy')
+                pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes)
 
                 tb_dict.update(pr_dict)
-                tb_dict.update(pr_dict_energy)
                 pseudo_labels_acc = []
-                pseudo_labels_energy = []
                 true_labels_acc = []
-                true_labels_energy = []
                 all_true_labels_acc = []
 
                 save_path = os.path.join(args.save_dir, args.save_name)
