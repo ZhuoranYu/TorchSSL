@@ -200,10 +200,6 @@ class EnergyMatch:
         true_labels_acc = []
         all_true_labels_acc = []
 
-        scores_ulb = []
-        label_ulb = []
-        energy_ulb = []
-
         for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s, y_ulb) in zip(self.loader_dict['train_lb'],
                                                                   self.loader_dict['train_ulb']):
 
@@ -252,12 +248,6 @@ class EnergyMatch:
                 true_labels_acc.append(y_ulb[mask_raw])
                 all_true_labels_acc.append(y_ulb)
 
-                T = 1.0
-
-                energy = -T * torch.logsumexp(logits_x_ulb_w / T, dim=1)
-                scores_ulb.append(F.softmax(logits_x_ulb_w, dim=-1).detach())
-                label_ulb.append(y_ulb)
-                energy_ulb.append(energy)
 
             # parameter updates
             if args.amp:
@@ -295,13 +285,6 @@ class EnergyMatch:
                 if not args.multiprocessing_distributed or \
                         (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
                     self.save_model('latest_model.pth', save_path)
-
-            if self.it % 100 == 0:
-                self.save_energy_real(scores_ulb, label_ulb, energy_ulb)
-                self.save_energy_pseudo(scores_ulb, label_ulb, energy_ulb)
-                scores_ulb = []
-                label_ulb = []
-                energy_ulb = []
 
 
             if self.it % self.num_eval_iter == 0:

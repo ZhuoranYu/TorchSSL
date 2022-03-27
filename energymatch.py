@@ -362,6 +362,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--e_cutoff', default=-8.75, type=int)
     parser.add_argument('--joint_conf', default=False, type=bool)
+    parser.add_argument('--temperature', default=1.0, type=int)
 
     # config file
     parser.add_argument('--c', type=str, default='')

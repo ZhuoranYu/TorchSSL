@@ -1,5 +1,5 @@
-save_dir: ./saved_models
-save_name: energy_cifar10_40_0
+save_dir: ./ood
+save_name: energy_cifar10_40_0_thres8.75_T2.0
 resume: False
 load_path: None
 overwrite: True
@@ -40,3 +40,6 @@ multiprocessing_distributed: False
 dist_url: tcp://127.0.0.1:10006
 dist_backend: nccl
 gpu: 0
+e_cutoff: -8.75
+joint_conf: True
+temperature: 2.0
