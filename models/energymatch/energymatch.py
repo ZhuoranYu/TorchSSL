@@ -241,10 +241,10 @@ class EnergyMatch:
 
                 unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
                                                                        logits_x_ulb_w,
+                                                                       args.x1, args.y1, args.x2, args.y2, args.degree,
                                                                        'ce', p_cutoff, args.e_cutoff,
                                                                        joint_conf=args.joint_conf,
                                                                        use_hard_labels=args.hard_label)
-
 
                 total_loss = sup_loss + self.lambda_u * unsup_loss
 
