@@ -45,9 +45,7 @@ long_tail: True
 imb_ratio_lb: 100
 imb_ratio_ulb: 100
 labeled_percentage: 10
-e_cutoff: -9
-joint_conf: False
-temperature: 1.0
+e_cutoff: -8.75
 x1: 0.5
 y1: -7.5
 x2: 1.0

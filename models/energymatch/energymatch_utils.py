@@ -41,11 +41,11 @@ def consistency_loss(logits_s, logits_w, x1, y1, x2, y2, degree, name='ce', p_cu
 
         max_probs, max_idx = torch.max(pseudo_label, dim=-1)
 
-        boundary = alpha * torch.exp(beta * (max_probs ** degree))
-        mask_raw = energy < boundary
-
         if joint_conf:
-            mask_raw = torch.logical_and(mask_raw, max_probs > p_cutoff)
+            boundary = alpha * torch.exp(beta * (max_probs ** degree))
+            mask_raw = energy < boundary
+        else:
+            mask_raw = energy < e_cutoff
         mask = mask_raw.float()
         select = max_probs[mask_raw]
 
