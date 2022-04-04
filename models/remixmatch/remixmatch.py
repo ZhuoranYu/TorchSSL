@@ -156,9 +156,9 @@ class ReMixMatch:
                         p_model = torch.mean(prob_x_ulb.detach(), dim=0)
                     else:
                         p_model = p_model * 0.999 + torch.mean(prob_x_ulb.detach(), dim=0) * 0.001
-
-                    prob_x_ulb = prob_x_ulb * p_target / p_model
-                    prob_x_ulb = (prob_x_ulb / prob_x_ulb.sum(dim=-1, keepdim=True))
+                    if args.da:
+                        prob_x_ulb = prob_x_ulb * p_target / p_model
+                        prob_x_ulb = (prob_x_ulb / prob_x_ulb.sum(dim=-1, keepdim=True))
 
                     sharpen_prob_x_ulb = prob_x_ulb ** (1 / T)
                     sharpen_prob_x_ulb = (sharpen_prob_x_ulb / sharpen_prob_x_ulb.sum(dim=-1, keepdim=True)).detach()

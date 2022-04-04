@@ -1,5 +1,5 @@
 import pickle
-
+import json
 import torch
 import numpy as np
 import pandas as pd
@@ -200,6 +200,16 @@ class EnergyMatch:
         true_labels_acc = []
         all_true_labels_acc = []
 
+        dist_file_name = r"./data_statistics/" + args.dataset + '_' + str(args.num_labels) + '.json'
+        with open(dist_file_name, 'r') as f:
+            p_target = json.loads(f.read())
+            p_target = torch.tensor(p_target['distribution'])
+            p_target = p_target.cuda(args.gpu)
+        print('p_target:', p_target)
+
+        p_model = None
+
+
         for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s, y_ulb) in zip(self.loader_dict['train_lb'],
                                                                   self.loader_dict['train_ulb']):
 
@@ -234,6 +244,15 @@ class EnergyMatch:
 
                 T = self.t_fn(self.it)
                 p_cutoff = self.p_fn(self.it)
+
+                if args.da:
+                    prob_x_ulb = torch.softmax(logits_x_ulb_w, dim=1)
+                    if p_model == None:
+                        p_model = torch.mean(prob_x_ulb.detach(), dim=0)
+                    else:
+                        p_model = p_model * 0.999 + torch.mean(prob_x_ulb.detach(), dim=0) * 0.001
+                    prob_x_ulb = prob_x_ulb * p_target / p_model
+                    prob_x_ulb = (prob_x_ulb / prob_x_ulb.sum(dim=-1, keepdim=True))
 
                 unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
                                                                        logits_x_ulb_w,
