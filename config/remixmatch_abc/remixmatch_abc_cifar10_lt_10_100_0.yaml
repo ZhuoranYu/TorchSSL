@@ -1,5 +1,5 @@
-save_dir: ./saved_models
-save_name: remixmatch_cifar10_40_0
+save_dir: ./analysis
+save_name: remixmatch_abc_cifar10_lt_10_100_seed0
 resume: False
 load_path: None
 overwrite: True
@@ -26,7 +26,7 @@ lr: 0.03
 momentum: 0.9
 weight_decay: 0.0005
 amp: False
-net: WideResNet
+net: WideResNetCB
 net_from_name: False
 depth: 28
 widen_factor: 2
@@ -36,7 +36,7 @@ data_dir: ./data
 dataset: cifar10
 train_sampler: RandomSampler
 num_classes: 10
-num_workers: 1
+num_workers: 4
 alg: remixmatch
 seed: 0
 world_size: 1
@@ -49,4 +49,4 @@ long_tail: True
 imb_ratio_lb: 100
 imb_ratio_ulb: 100
 labeled_percentage: 10
-da: False
+cycle: 0.
