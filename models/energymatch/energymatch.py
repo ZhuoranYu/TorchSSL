@@ -245,21 +245,22 @@ class EnergyMatch:
                 T = self.t_fn(self.it)
                 p_cutoff = self.p_fn(self.it)
 
-                if args.da:
-                    prob_x_ulb = torch.softmax(logits_x_ulb_w, dim=1)
-                    if p_model == None:
-                        p_model = torch.mean(prob_x_ulb.detach(), dim=0)
-                    else:
-                        p_model = p_model * 0.999 + torch.mean(prob_x_ulb.detach(), dim=0) * 0.001
-                    prob_x_ulb = prob_x_ulb * p_target / p_model
-                    prob_x_ulb = (prob_x_ulb / prob_x_ulb.sum(dim=-1, keepdim=True))
+                # if args.da:
+                #     prob_x_ulb = torch.softmax(logits_x_ulb_w, dim=1)
+                #     if p_model == None:
+                #         p_model = torch.mean(prob_x_ulb.detach(), dim=0)
+                #     else:
+                #         p_model = p_model * 0.999 + torch.mean(prob_x_ulb.detach(), dim=0) * 0.001
+                #     prob_x_ulb = prob_x_ulb * p_target / p_model
+                #     prob_x_ulb = (prob_x_ulb / prob_x_ulb.sum(dim=-1, keepdim=True))
 
                 unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
                                                                        logits_x_ulb_w,
                                                                        args.x1, args.y1, args.x2, args.y2, args.degree,
                                                                        'ce', p_cutoff, args.e_cutoff,
                                                                        joint_conf=args.joint_conf,
-                                                                       use_hard_labels=args.hard_label)
+                                                                       use_hard_labels=args.hard_label,
+                                                                       K=args.num_classes)
 
                 total_loss = sup_loss + self.lambda_u * unsup_loss
 

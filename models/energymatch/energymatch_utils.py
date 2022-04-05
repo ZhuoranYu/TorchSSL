@@ -22,7 +22,7 @@ def interpolation(x1, y1, x2, y2, k):
     return alpha, beta
 
 
-def consistency_loss(logits_s, logits_w, x1, y1, x2, y2, degree, name='ce', p_cutoff=0.95, e_cutoff=-8.75, joint_conf=False, use_hard_labels=True):
+def consistency_loss(logits_s, logits_w, x1, y1, x2, y2, degree, name='ce', p_cutoff=0.95, e_cutoff=-8.75, joint_conf=False, use_hard_labels=True, K=10):
     assert name in ['ce', 'L2']
     logits_w = logits_w.detach()
 

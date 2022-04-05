@@ -82,6 +82,64 @@ class FixMatch:
         self.optimizer = optimizer
         self.scheduler = scheduler
 
+    def save_energy_pseudo(self, dataset, scores_ulb, label_ulb, energy_ulb):
+        scores_ulb = torch.cat(scores_ulb, dim=0)
+        label_ulb = torch.cat(label_ulb, dim=0)
+        max_score, max_index = torch.max(scores_ulb, dim=-1)
+        incorrect_mask = (max_index != label_ulb)
+
+        pred_column = torch.zeros_like(label_ulb)  # to store correctness
+        pred_column[incorrect_mask] = 1  # incorrectly predicted as head
+        pred_column = pred_column
+
+        energy_ulb = torch.cat(energy_ulb, dim=0)
+
+        # from pseudo label's perspective
+        data = np.vstack([max_score.detach().cpu().numpy(), energy_ulb.detach().cpu().numpy(),
+                          pred_column.detach().cpu().numpy().astype(np.float)]).transpose()
+        df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
+        os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
+        df.to_csv(f'{dataset}_track/{self.it // 1000}k/overall_pseudo.csv', index=False)
+        for c in range(self.num_classes):
+            c_mask = max_index == c
+            c_score = max_score[c_mask].detach().cpu().numpy()
+            c_energy = energy_ulb[c_mask].detach().cpu().numpy()
+            c_pred_column = pred_column[c_mask].detach().cpu().numpy().astype(np.float)
+
+            data = np.vstack([c_score, c_energy, c_pred_column]).transpose()
+            df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
+            os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
+            df.to_csv(f'{dataset}_track/{self.it // 1000}k/class_{c}_pseudo.csv', index=False)
+
+    def save_energy_real(self, dataset, scores_ulb, label_ulb, energy_ulb):
+        scores_ulb = torch.cat(scores_ulb, dim=0)
+        label_ulb = torch.cat(label_ulb, dim=0)
+        max_score, max_index = torch.max(scores_ulb, dim=-1)
+        incorrect_mask = (max_index != label_ulb)
+
+        pred_column = torch.zeros_like(label_ulb)  # to store correctness
+        pred_column[incorrect_mask] = 1  # incorrectly predicted as head
+        pred_column = pred_column
+
+        energy_ulb = torch.cat(energy_ulb, dim=0)
+
+        # from real label's perspective
+        data = np.vstack([max_score.detach().cpu().numpy(), energy_ulb.detach().cpu().numpy(),
+                          pred_column.detach().cpu().numpy().astype(np.float)]).transpose()
+        df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
+        os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
+        df.to_csv(f'{dataset}_track/{self.it // 1000}k/overall_real.csv', index=False)
+        for c in range(self.num_classes):
+            c_mask = label_ulb == c
+            c_score = max_score[c_mask].detach().cpu().numpy()
+            c_energy = energy_ulb[c_mask].detach().cpu().numpy()
+            c_pred_column = pred_column[c_mask].detach().cpu().numpy().astype(np.float)
+
+            data = np.vstack([c_score, c_energy, c_pred_column]).transpose()
+            df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
+            os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
+            df.to_csv(f'{dataset}_track/{self.it // 1000}k/class_{c}_real.csv', index=False)
+
     def train(self, args, logger=None):
 
         ngpus_per_node = torch.cuda.device_count()
@@ -115,7 +173,11 @@ class FixMatch:
 
         classwise_acc = torch.zeros((args.num_classes,)).cuda(args.gpu)
 
-        for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s, _) in zip(self.loader_dict['train_lb'],
+        scores_ulb = []
+        label_ulb = []
+        energy_ulb = []
+
+        for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s, y_ulb) in zip(self.loader_dict['train_lb'],
                                                                   self.loader_dict['train_ulb']):
 
             # prevent the training iterations exceed args.num_train_iter
@@ -131,7 +193,7 @@ class FixMatch:
             assert num_ulb == x_ulb_s.shape[0]
 
             x_lb, x_ulb_w, x_ulb_s = x_lb.cuda(args.gpu), x_ulb_w.cuda(args.gpu), x_ulb_s.cuda(args.gpu)
-            y_lb = y_lb.cuda(args.gpu)
+            y_lb, y_ulb = y_lb.cuda(args.gpu), y_ulb.cuda(args.gpu)
 
             pseudo_counter = Counter(selected_label.tolist())
             if max(pseudo_counter.values()) < len(self.ulb_dset):  # not all(5w) -1
@@ -150,6 +212,11 @@ class FixMatch:
                 # hyper-params for update
                 T = self.t_fn(self.it)
                 p_cutoff = self.p_fn(self.it)
+
+                energy = -T * torch.logsumexp(logits_x_ulb_w / T, dim=1)
+                scores_ulb.append(F.softmax(logits_x_ulb_w, dim=-1).detach())
+                label_ulb.append(y_ulb)
+                energy_ulb.append(energy)
 
                 unsup_loss, mask, select, pseudo_lb = consistency_loss(logits_x_ulb_s,
                                                                        logits_x_ulb_w,
@@ -194,6 +261,15 @@ class FixMatch:
                 if not args.multiprocessing_distributed or \
                         (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
                     self.save_model('latest_model.pth', save_path)
+
+            if self.it % 5000 == 0:
+                self.save_energy_real(args.dataset, scores_ulb, label_ulb, energy_ulb)
+                self.save_energy_pseudo(args.dataset, scores_ulb, label_ulb, energy_ulb)
+
+            if self.it % 100 == 0:
+                scores_ulb = []
+                label_ulb = []
+                energy_ulb = []
 
             if self.it % self.num_eval_iter == 0:
                 eval_dict = self.evaluate(args=args)
