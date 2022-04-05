@@ -227,12 +227,16 @@ class ReMixMatchABC:
                 max_scores, max_indices = torch.max(prob_x_ulb_cb, dim=-1)
                 select_mask = max_scores.ge(0.95).float()
 
-                if self.it % 500 == 0:
+                if self.it % 512 == 0:
                     self.e += 1
-                e = self.e / 786
-                ir22 = 1 - (e / 500) * (1 - p_target)
+                e = self.e / 250
+                if self.e > 250:
+                    e = 1
+                    
+                sample_p = p_target[-1] / p_target
+                ir22 = 1 - (e / 500) * (1 - sample_p)
                 u_mask = torch.bernoulli(torch.tensor(ir22).cuda(args.gpu)[max_indices].detach())
-                x_mask = torch.bernoulli(torch.tensor(p_target).cuda(args.gpu)[y_lb].detach())
+                x_mask = torch.bernoulli(torch.tensor(sample_p).cuda(args.gpu)[y_lb].detach())
 
                 abc_loss_x = F.cross_entropy(logits_x_lb_cb, y_lb, reduction='none') * x_mask
                 abc_loss_x = abc_loss_x.mean()

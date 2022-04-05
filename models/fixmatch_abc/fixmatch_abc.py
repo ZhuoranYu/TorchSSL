@@ -191,9 +191,11 @@ class FixMatchABC:
                 e = self.e / 250
                 if self.e > 250:
                     e = 1
-                ir22 = 1 - e * (1 - p_target)
+
+                sample_p = p_target[-1] / p_target
+                ir22 = 1 - e * (1 - sample_p)
                 u_mask = torch.bernoulli(torch.tensor(ir22).cuda(args.gpu)[max_indices].detach())
-                x_mask = torch.bernoulli(torch.tensor(p_target).cuda(args.gpu)[y_lb].detach())
+                x_mask = torch.bernoulli(torch.tensor(sample_p).cuda(args.gpu)[y_lb].detach())
 
                 targets_x = torch.zeros(y_lb.shape[0], self.num_classes).scatter_(1, y_lb.cpu().view(-1, 1), 1)
                 abc_loss_x = -torch.mean(
