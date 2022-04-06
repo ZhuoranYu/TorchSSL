@@ -18,7 +18,7 @@ import json
 from copy import deepcopy
 
 
-class ReMixMatchABC:
+class ReMixMatchABCEnergy:
     def __init__(self, net_builder, num_classes, ema_m, T, lambda_u, \
                  w_match,
                  t_fn=None, it=0, num_eval_iter=1000, tb_log=None, logger=None):
@@ -38,7 +38,7 @@ class ReMixMatchABC:
             logger: logger (see utils.py)
         """
 
-        super(ReMixMatchABC, self).__init__()
+        super(ReMixMatchABCEnergy, self).__init__()
 
         # momentum update param
         self.loader = {}
@@ -225,7 +225,8 @@ class ReMixMatchABC:
 
                 prob_x_ulb_cb = F.softmax(logits_x_ulb_w_cb, dim=-1)
                 max_scores, max_indices = torch.max(prob_x_ulb_cb, dim=-1)
-                select_mask = max_scores.ge(0.95).float()
+                energy = -torch.logsumexp(logits_x_ulb_w_cb, dim=1)
+                select_mask = energy.le(args.e_cutoff).float()
 
                 if self.it % 512 == 0:
                     self.e += 1
