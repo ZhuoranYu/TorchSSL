@@ -1,5 +1,5 @@
-save_dir: ./saved_models
-save_name: fixmatch_cifar100_400_0
+save_dir: ./cifar-100
+save_name: energymatch_cifar100_400_0
 resume: False
 load_path: None
 overwrite: True
@@ -36,7 +36,14 @@ alg: fixmatch
 seed: 0
 world_size: 1
 rank: 0
-multiprocessing_distributed: False
+multiprocessing_distributed: True
 dist_url: tcp://127.0.0.1:10007
 dist_backend: nccl
-gpu: 0
+gpu: None
+e_cutoff: -16.0
+joint_conf: False
+x1: 0.5
+y1: -9
+x2: 1.0
+y2: -12
+degree: 20
