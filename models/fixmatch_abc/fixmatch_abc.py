@@ -186,10 +186,10 @@ class FixMatchABC:
                 max_scores, max_indices = torch.max(prob_x_ulb_cb, dim=-1)
                 select_mask = max_scores.ge(0.95).float()
 
-                if self.it % 512 == 0:
+                if self.it % 500 == 0:
                     self.e += 1
-                e = self.e / 250
-                if self.e > 250:
+                e = self.e / 600
+                if self.e > 600:
                     e = 1
 
                 sample_p = p_target[-1] / p_target

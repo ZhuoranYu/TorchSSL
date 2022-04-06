@@ -228,10 +228,10 @@ class ReMixMatchABCEnergy:
                 energy = -torch.logsumexp(logits_x_ulb_w_cb, dim=1)
                 select_mask = energy.le(args.e_cutoff).float()
 
-                if self.it % 512 == 0:
+                if self.it % 500 == 0:
                     self.e += 1
-                e = self.e / 250
-                if self.e > 250:
+                e = self.e / 600
+                if self.e > 600:
                     e = 1
 
                 sample_p = p_target[-1] / p_target

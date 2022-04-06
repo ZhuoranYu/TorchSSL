@@ -213,7 +213,7 @@ class FixMatch:
                 T = self.t_fn(self.it)
                 p_cutoff = self.p_fn(self.it)
 
-                energy = -T * torch.logsumexp(logits_x_ulb_w / T, dim=1)
+                energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
                 scores_ulb.append(F.softmax(logits_x_ulb_w, dim=-1).detach())
                 label_ulb.append(y_ulb)
                 energy_ulb.append(energy)
