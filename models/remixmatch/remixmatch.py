@@ -260,9 +260,10 @@ class ReMixMatch:
                 if tb_dict['eval/top-1-acc'] > best_eval_acc:
                     best_eval_acc = tb_dict['eval/top-1-acc']
                     best_it = self.it
+                    best_minority_acc = tb_dict['eval/minority-acc']
 
                 self.print_fn(
-                    f"{self.it} iteration, USE_EMA: {self.ema_m != 0}, {tb_dict}, BEST_EVAL_ACC: {best_eval_acc}, at {best_it} iters")
+                    f"{self.it} iteration, USE_EMA: {self.ema_m != 0}, {tb_dict}, BEST_EVAL_ACC: {best_eval_acc}, MINORITY_ACC: {best_minority_acc}, at {best_it} iters")
                 total_time = 0
 
                 if not args.multiprocessing_distributed or \
@@ -305,13 +306,19 @@ class ReMixMatch:
             y_pred.extend(torch.max(logits, dim=-1)[1].cpu().tolist())
             y_logits.extend(torch.softmax(logits, dim=-1).cpu().tolist())
             total_loss += loss.detach() * num_batch
+
+        minority_mask = torch.logical_or(torch.logical_or(torch.tensor(y_true) == 9, torch.tensor(y_true) == 8), torch.tensor(y_true) == 7)
+        y_mino = torch.tensor(y_true)[minority_mask].tolist()
+        pred_mino = torch.tensor(y_pred)[minority_mask].tolist()
+        minority_acc = accuracy_score(y_mino, pred_mino)
+
         top1 = accuracy_score(y_true, y_pred)
         top5 = top_k_accuracy_score(y_true, y_logits, k=5)
         cf_mat = confusion_matrix(y_true, y_pred, normalize='true')
         self.print_fn('confusion matrix:\n' + np.array_str(cf_mat))
         self.ema.restore()
         self.model.train()
-        return {'eval/loss': total_loss / total_num, 'eval/top-1-acc': top1, 'eval/top-5-acc': top5}
+        return {'eval/loss': total_loss / total_num, 'eval/top-1-acc': top1, 'eval/top-5-acc': top5, 'eval/minority-acc': minority_acc}
 
     def save_model(self, save_name, save_path):
         if self.it < 1000000:
