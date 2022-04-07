@@ -217,11 +217,13 @@ class ReMixMatchABCEnergy:
                 w_kl = args.w_kl * float(np.clip(self.it / (args.warm_up * args.num_train_iter), 0.0, 1.0))
 
                 # abc
+                self.bn_controller.freeze_bn(self.model)
                 input = torch.cat((x_lb, x_ulb_w, x_ulb_s1, x_ulb_s2))
                 feats = self.model(input)
                 logits_cb = self.model.classify_cb(feats)
                 logits_x_lb_cb = logits_cb[:num_lb]
                 logits_x_ulb_w_cb, logits_x_ulb_s1_cb, logits_x_ulb_s2_cb = logits_cb[num_lb:].chunk(3)
+                self.bn_controller.unfreeze_bn(self.model)
 
                 prob_x_ulb_cb = F.softmax(logits_x_ulb_w_cb, dim=-1)
                 max_scores, max_indices = torch.max(prob_x_ulb_cb, dim=-1)
@@ -235,7 +237,7 @@ class ReMixMatchABCEnergy:
                     e = 1
 
                 sample_p = p_target[-1] / p_target
-                ir22 = 1 - (e / 500) * (1 - sample_p)
+                ir22 = 1 - e * (1 - sample_p)
                 u_mask = torch.bernoulli(torch.tensor(ir22).cuda(args.gpu)[max_indices].detach())
                 x_mask = torch.bernoulli(torch.tensor(sample_p).cuda(args.gpu)[y_lb].detach())
 
