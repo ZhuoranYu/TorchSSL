@@ -349,6 +349,15 @@ if __name__ == "__main__":
     # config file
     parser.add_argument('--c', type=str, default='')
 
+    '''
+    long-tail hyper-parameters
+    '''
+    parser.add_argument('--long_tail', type=bool, default=False)
+    parser.add_argument('--imb_ratio_lb', type=int, default=100)
+    parser.add_argument('--imb_ratio_ulb', type=int, default=100)
+    parser.add_argument('--labeled_percentage', type=float, default=10)
+
+
     args = parser.parse_args()
     over_write_args_from_file(args, args.c)
     main(args)
