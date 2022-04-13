@@ -178,10 +178,6 @@ class EnergyMatch:
         true_labels_acc = []
         all_true_labels_acc = []
 
-        scores_ulb = []
-        label_ulb = []
-        energy_ulb = []
-
         dist_file_name = r"./data_statistics/" + args.dataset + '_' + str(args.num_labels) + '.json'
         with open(dist_file_name, 'r') as f:
             p_target = json.loads(f.read())
@@ -227,26 +223,29 @@ class EnergyMatch:
                 T = self.t_fn(self.it)
                 p_cutoff = self.p_fn(self.it)
 
-                # if args.da:
-                #     prob_x_ulb = torch.softmax(logits_x_ulb_w, dim=1)
-                #     if p_model == None:
-                #         p_model = torch.mean(prob_x_ulb.detach(), dim=0)
-                #     else:
-                #         p_model = p_model * 0.999 + torch.mean(prob_x_ulb.detach(), dim=0) * 0.001
-                #     prob_x_ulb = prob_x_ulb * p_target / p_model
-                #     prob_x_ulb = (prob_x_ulb / prob_x_ulb.sum(dim=-1, keepdim=True))
-                energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
-                scores_ulb.append(F.softmax(logits_x_ulb_w, dim=-1).detach())
-                label_ulb.append(y_ulb)
-                energy_ulb.append(energy)
+                if args.da:
+                    prob_x_ulb = torch.softmax(logits_x_ulb_w, dim=1)
+                    if p_model == None:
+                        p_model = torch.mean(prob_x_ulb.detach(), dim=0)
+                    else:
+                        p_model = p_model * 0.999 + torch.mean(prob_x_ulb.detach(), dim=0) * 0.001
+                    prob_x_ulb = prob_x_ulb * p_target / p_model
+                    prob_x_ulb = (prob_x_ulb / prob_x_ulb.sum(dim=-1, keepdim=True))
 
-                unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
-                                                                       logits_x_ulb_w,
-                                                                       args.x1, args.y1, args.x2, args.y2, args.degree,
-                                                                       'ce', p_cutoff, args.e_cutoff,
-                                                                       joint_conf=args.joint_conf,
-                                                                       use_hard_labels=args.hard_label,
-                                                                       K=args.num_classes)
+
+                    unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
+                                                                           prob_x_ulb,
+                                                                           'ce', p_cutoff, args.e_cutoff,
+                                                                           softmax=True,
+                                                                           use_hard_labels=args.hard_label)
+                else:
+                    unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
+                                                                                            logits_x_ulb_w,
+                                                                                            'ce', p_cutoff,
+                                                                                            args.e_cutoff,
+                                                                                            softmax=False,
+                                                                                            use_hard_labels=args.hard_label)
+
 
                 total_loss = sup_loss + self.lambda_u * unsup_loss
 
@@ -291,16 +290,6 @@ class EnergyMatch:
                 if not args.multiprocessing_distributed or \
                         (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
                     self.save_model('latest_model.pth', save_path)
-
-            if self.it % 5000 == 0:
-                self.save_energy_real(args.dataset, scores_ulb, label_ulb, energy_ulb)
-                self.save_energy_pseudo(args.dataset, scores_ulb, label_ulb, energy_ulb)
-
-            if self.it % 500 == 0:
-                scores_ulb = []
-                label_ulb = []
-                energy_ulb = []
-
 
             if self.it % self.num_eval_iter == 0:
                 prob_prec_dict = analyze_prob(select_scores, pseudo_lb[mask_raw], y_ulb[mask_raw])
