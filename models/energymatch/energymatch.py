@@ -234,15 +234,15 @@ class EnergyMatch:
 
 
                     unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
-                                                                           prob_x_ulb,
-                                                                           'ce', p_cutoff, args.e_cutoff,
+                                                                           logits_x_ulb_w,
+                                                                           prob_w=prob_x_ulb,
+                                                                           e_cutoff=args.e_cutoff,
                                                                            softmax=True,
                                                                            use_hard_labels=args.hard_label)
                 else:
                     unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
                                                                                             logits_x_ulb_w,
-                                                                                            'ce', p_cutoff,
-                                                                                            args.e_cutoff,
+                                                                                            e_cutoff=args.e_cutoff,
                                                                                             softmax=False,
                                                                                             use_hard_labels=args.hard_label)
 
