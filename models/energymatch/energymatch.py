@@ -201,8 +201,9 @@ class EnergyMatch:
 
             num_lb = x_lb.shape[0]
             num_ulb = x_ulb_w.shape[0]
-            assert num_ulb == x_ulb_s.shape[0]
+            assert num_ulb == x_ulb_s[0].shape[0]
 
+            x_ulb_s = torch.cat(x_ulb_s, dim=0)
             x_lb, x_ulb_w, x_ulb_s = x_lb.cuda(args.gpu), x_ulb_w.cuda(args.gpu), x_ulb_s.cuda(args.gpu)
             y_lb, y_ulb = y_lb.cuda(args.gpu), y_ulb.cuda(args.gpu)
 
@@ -217,34 +218,14 @@ class EnergyMatch:
             with amp_cm():
                 logits = self.model(inputs)
                 logits_x_lb = logits[:num_lb]
-                logits_x_ulb_w, logits_x_ulb_s = logits[num_lb:].chunk(2)
+                logits_x_ulb_w = logits[num_lb:num_lb+num_ulb]
+                logits_x_ulb_s = logits[num_lb+num_ulb:]
                 sup_loss = ce_loss(logits_x_lb, y_lb, reduction='mean')
 
-                T = self.t_fn(self.it)
-                p_cutoff = self.p_fn(self.it)
-
-                if args.da:
-                    prob_x_ulb = torch.softmax(logits_x_ulb_w, dim=1)
-                    if p_model == None:
-                        p_model = torch.mean(prob_x_ulb.detach(), dim=0)
-                    else:
-                        p_model = p_model * 0.999 + torch.mean(prob_x_ulb.detach(), dim=0) * 0.001
-                    prob_x_ulb = prob_x_ulb * p_target / p_model
-                    prob_x_ulb = (prob_x_ulb / prob_x_ulb.sum(dim=-1, keepdim=True))
-
-
-                    unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
-                                                                           logits_x_ulb_w,
-                                                                           prob_w=prob_x_ulb,
-                                                                           e_cutoff=args.e_cutoff,
-                                                                           softmax=True,
-                                                                           use_hard_labels=args.hard_label)
-                else:
-                    unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
-                                                                                            logits_x_ulb_w,
-                                                                                            e_cutoff=args.e_cutoff,
-                                                                                            softmax=False,
-                                                                                            use_hard_labels=args.hard_label)
+                unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
+                                                                                        logits_x_ulb_w,
+                                                                                        e_cutoff=args.e_cutoff,
+                                                                                        use_hard_labels=args.hard_label)
 
 
                 total_loss = sup_loss + self.lambda_u * unsup_loss

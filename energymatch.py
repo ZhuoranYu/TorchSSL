@@ -187,11 +187,11 @@ def main_worker(gpu, ngpus_per_node, args):
 
     # Construct Dataset & DataLoader
     if args.dataset != "imagenet":
-        train_dset = SSL_Dataset(args, alg='fixmatch', name=args.dataset, train=True,
+        train_dset = SSL_Dataset(args, alg='energymatch', name=args.dataset, train=True,
                                  num_classes=args.num_classes, data_dir=args.data_dir)
         lb_dset, ulb_dset = train_dset.get_ssl_dset(args.num_labels)
 
-        _eval_dset = SSL_Dataset(args, alg='fixmatch', name=args.dataset, train=False,
+        _eval_dset = SSL_Dataset(args, alg='energymatch', name=args.dataset, train=False,
                                  num_classes=args.num_classes, data_dir=args.data_dir)
         eval_dset = _eval_dset.get_dset()
     else:
