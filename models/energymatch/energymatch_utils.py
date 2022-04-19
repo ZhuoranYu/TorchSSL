@@ -22,10 +22,14 @@ def interpolation(x1, y1, x2, y2, k):
     return alpha, beta
 
 
-def consistency_loss(logits_s, logits_w, e_cutoff=-8.75, use_hard_labels=True):
+def consistency_loss(logits_s, logits_w, ratio=None, e_cutoff=-8.75, use_hard_labels=True):
     logits_w = logits_w.detach()
 
-    energy = -torch.logsumexp(logits_w, dim=1)
+    if ratio is None:
+        energy = -torch.logsumexp(logits_w, dim=1)
+    else:
+        exp_r = torch.exp(logits_w) * ratio
+        energy = -torch.log(torch.sum(exp_r, dim=1))
     pseudo_label = torch.softmax(logits_w, dim=-1)
 
     max_probs, max_idx = torch.max(pseudo_label, dim=-1)
