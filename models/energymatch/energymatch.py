@@ -269,8 +269,6 @@ class EnergyMatch:
 
 
             if self.it % self.num_eval_iter == 0:
-                # prob_prec_dict = analyze_prob(select_scores, pseudo_lb[mask_raw], y_ulb[mask_raw])
-                # tb_dict.update(prob_prec_dict)
 
                 eval_dict = self.evaluate(args=args)
                 tb_dict.update(eval_dict)

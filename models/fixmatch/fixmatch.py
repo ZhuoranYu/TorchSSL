@@ -271,19 +271,7 @@ class FixMatch:
                         (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
                     self.save_model('latest_model.pth', save_path)
 
-            if self.it % 5000 == 0:
-                self.save_energy_real(args.dataset, scores_ulb, label_ulb, energy_ulb)
-                self.save_energy_pseudo(args.dataset, scores_ulb, label_ulb, energy_ulb)
-
             if self.it % 100 == 0:
-                scores_ulb = []
-                label_ulb = []
-                energy_ulb = []
-
-            if self.it % self.num_eval_iter == 0:
-                eval_dict = self.evaluate(args=args)
-                tb_dict.update(eval_dict)
-
                 pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes)
 
                 tb_dict.update(pr_dict)
@@ -291,15 +279,19 @@ class FixMatch:
                 true_labels_acc = []
                 all_true_labels_acc = []
 
+            if self.it % self.num_eval_iter == 0:
+
+                eval_dict = self.evaluate(args=args)
+                tb_dict.update(eval_dict)
+
                 save_path = os.path.join(args.save_dir, args.save_name)
 
                 if tb_dict['eval/top-1-acc'] > best_eval_acc:
                     best_eval_acc = tb_dict['eval/top-1-acc']
                     best_it = self.it
-                    best_minority_acc = tb_dict['eval/minority-acc']
 
                 self.print_fn(
-                    f"{self.it} iteration, USE_EMA: {self.ema_m != 0}, {tb_dict}, BEST_EVAL_ACC: {best_eval_acc}, MINORITY_ACC: {best_minority_acc}, at {best_it} iters")
+                    f"{self.it} iteration, USE_EMA: {self.ema_m != 0}, {tb_dict}, BEST_EVAL_ACC: {best_eval_acc}, at {best_it} iters")
                 total_time = 0
 
                 if not args.multiprocessing_distributed or \
