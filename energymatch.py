@@ -369,6 +369,8 @@ if __name__ == "__main__":
     # config file
     parser.add_argument('--c', type=str, default='')
 
+    parser.add_argument('--num_views', type=int, default=2)
+
     args = parser.parse_args()
     over_write_args_from_file(args, args.c)
     main(args)

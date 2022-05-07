@@ -178,16 +178,7 @@ class EnergyMatch:
         true_labels_acc = []
         all_true_labels_acc = []
 
-        dist_file_name = r"./data_statistics/" + args.dataset + '_' + str(args.num_labels) + '.json'
-        with open(dist_file_name, 'r') as f:
-            p_target = json.loads(f.read())
-            p_target = torch.tensor(p_target['distribution'])
-            p_target = p_target.cuda(args.gpu)
-        print('p_target:', p_target)
-
-        p_model = None
-
-        for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s) in zip(self.loader_dict['train_lb'],
+        for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s, y_ulb) in zip(self.loader_dict['train_lb'],
                                                                   self.loader_dict['train_ulb']):
 
             # prevent the training iterations exceed args.num_train_iter
@@ -202,7 +193,7 @@ class EnergyMatch:
             num_ulb = x_ulb_w.shape[0]
             assert num_ulb == x_ulb_s.shape[0]
             x_lb, x_ulb_w, x_ulb_s = x_lb.cuda(args.gpu), x_ulb_w.cuda(args.gpu), x_ulb_s.cuda(args.gpu)
-            y_lb = y_lb.cuda(args.gpu)
+            y_lb, y_ulb = y_lb.cuda(args.gpu), y_ulb.cuda(args.gpu)
 
             pseudo_counter = Counter(selected_label.tolist())
             if max(pseudo_counter.values()) < len(self.ulb_dset):  # not all(5w) -1
@@ -226,9 +217,9 @@ class EnergyMatch:
 
                 total_loss = sup_loss + self.lambda_u * unsup_loss
 
-                # pseudo_labels_acc.append(pseudo_lb[mask_raw])
-                # true_labels_acc.append(y_ulb[mask_raw])
-                # all_true_labels_acc.append(y_ulb)
+                pseudo_labels_acc.append(pseudo_lb[mask_raw])
+                true_labels_acc.append(y_ulb[mask_raw])
+                all_true_labels_acc.append(y_ulb)
 
 
             # parameter updates
@@ -268,19 +259,21 @@ class EnergyMatch:
                         (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
                     self.save_model('latest_model.pth', save_path)
 
+            if self.it % 100 == 0:
+                pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes)
+
+                tb_dict.update(pr_dict)
+                pseudo_labels_acc = []
+                true_labels_acc = []
+                all_true_labels_acc = []
+
+
             if self.it % self.num_eval_iter == 0:
                 # prob_prec_dict = analyze_prob(select_scores, pseudo_lb[mask_raw], y_ulb[mask_raw])
                 # tb_dict.update(prob_prec_dict)
 
                 eval_dict = self.evaluate(args=args)
                 tb_dict.update(eval_dict)
-
-                # pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes)
-                #
-                # tb_dict.update(pr_dict)
-                # pseudo_labels_acc = []
-                # true_labels_acc = []
-                # all_true_labels_acc = []
 
                 save_path = os.path.join(args.save_dir, args.save_name)
 
