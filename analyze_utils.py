@@ -11,7 +11,7 @@ def analyze_prob(scores, predictions, labels):
         else:
             t = np.round(t, 2)
             t1 = np.round(t + 0.05, 2)
-        mask = torch.logical_and(scores >= t, scores < t1)
+        mask = torch.logical_or(scores >= t, scores < t1)
         score_bin = scores[mask]
 
         if torch.numel(score_bin) == 0:
@@ -49,18 +49,21 @@ def analyze_pseudo_pr(pseudo_labels, true_labels, all_true_labels, num_classes):
     pr_dict[f'pseudo-f1/overall'] = f1_overall
 
 
-    head_mask_pseudo = torch.logical_and(torch.logical_and(pseudo_labels==0, pseudo_labels==1), pseudo_labels==2)
-    body_mask_pseudo = torch.logical_and(torch.logical_and(torch.logical_and(pseudo_labels == 3, pseudo_labels == 4), pseudo_labels == 5), pseudo_labels == 6)
-    tail_mask_pseudo = torch.logical_and(torch.logical_and(pseudo_labels == 7, pseudo_labels == 8), pseudo_labels == 9)
+    head_mask_pseudo = torch.logical_or(torch.logical_or(pseudo_labels==0, pseudo_labels==1), pseudo_labels==2)
+    body_mask_pseudo = torch.logical_or(torch.logical_or(torch.logical_or(pseudo_labels == 3, pseudo_labels == 4), pseudo_labels == 5), pseudo_labels == 6)
+    tail_mask_pseudo = torch.logical_or(torch.logical_or(pseudo_labels == 7, pseudo_labels == 8), pseudo_labels == 9)
 
-    head_mask_real = torch.logical_and(torch.logical_and(all_true_labels==0, all_true_labels==1), all_true_labels==2)
-    body_mask_real = torch.logical_and(torch.logical_and(torch.logical_and(all_true_labels == 3, all_true_labels == 4), all_true_labels == 5), all_true_labels == 6)
-    tail_mask_real = torch.logical_and(torch.logical_and(all_true_labels == 7, all_true_labels == 8), all_true_labels == 9)
+    head_mask_real = torch.logical_or(torch.logical_or(all_true_labels==0, all_true_labels==1), all_true_labels==2)
+    body_mask_real = torch.logical_or(torch.logical_or(torch.logical_or(all_true_labels == 3, all_true_labels == 4), all_true_labels == 5), all_true_labels == 6)
+    tail_mask_real = torch.logical_or(torch.logical_or(all_true_labels == 7, all_true_labels == 8), all_true_labels == 9)
 
     head_pseudo = pseudo_labels[head_mask_pseudo]
     head_true = true_labels[head_mask_pseudo]
     head_true_all = all_true_labels[head_mask_real]
     tp_head = torch.sum((head_pseudo == head_true).float())
+
+    if tp_head != 0:
+        x = 1
 
     precision_head = tp_head.cpu().item() / (head_pseudo.shape[0] + 1e-7)
     recall_head = tp_head.cpu().item() / (head_true_all.shape[0] + 1e-7)
