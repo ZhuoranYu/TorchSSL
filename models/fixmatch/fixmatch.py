@@ -228,6 +228,8 @@ class FixMatch:
                                                                        'ce', T, p_cutoff,
                                                                        use_hard_labels=args.hard_label)
 
+
+
                 total_loss = sup_loss + self.lambda_u * unsup_loss
 
                 pseudo_labels_acc.append(pseudo_lb[mask_raw])

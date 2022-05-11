@@ -201,7 +201,6 @@ class EnergyMatch:
                     classwise_acc[i] = pseudo_counter[i] / max(pseudo_counter.values())
 
             inputs = torch.cat((x_lb, x_ulb_w, x_ulb_s))
-
             # inference and calculate sup/unsup losses
             with amp_cm():
                 logits = self.model(inputs)
@@ -213,7 +212,6 @@ class EnergyMatch:
                                                                                         logits_x_ulb_w,
                                                                                         e_cutoff=args.e_cutoff,
                                                                                         use_hard_labels=args.hard_label)
-
 
                 total_loss = sup_loss + self.lambda_u * unsup_loss
 

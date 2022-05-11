@@ -62,9 +62,6 @@ def analyze_pseudo_pr(pseudo_labels, true_labels, all_true_labels, num_classes):
     head_true_all = all_true_labels[head_mask_real]
     tp_head = torch.sum((head_pseudo == head_true).float())
 
-    if tp_head != 0:
-        x = 1
-
     precision_head = tp_head.cpu().item() / (head_pseudo.shape[0] + 1e-7)
     recall_head = tp_head.cpu().item() / (head_true_all.shape[0] + 1e-7)
     f1_head = (2 * precision_head * recall_head) / (precision_head + recall_head + 1e-7)
@@ -95,6 +92,17 @@ def analyze_pseudo_pr(pseudo_labels, true_labels, all_true_labels, num_classes):
     pr_dict[f'pseudo-precision/tail'] = precision_tail
     pr_dict[f'pseudo-recall/tail'] = recall_tail
     pr_dict[f'pseudo-f1/tail'] = f1_tail
+
+    for c in range(10):
+        c_mask = pseudo_labels == c
+        c_pseudo = pseudo_labels[c_mask]
+        c_true = true_labels[c_mask]
+        c_true_all = all_true_labels[all_true_labels == c]
+        tp_c = torch.sum((c_pseudo == c_true).float())
+        pr_dict[f'pseudo-precision/class_{c}'] = tp_c.cpu().item() / (c_pseudo.shape[0] + 1e-7)
+        pr_dict[f'pseudo-recall/class_{c}'] = tp_c.cpu().item() / (c_true_all.shape[0] + 1e-7)
+
+
 
 
 
