@@ -213,6 +213,7 @@ class EnergyMatch:
                                                                                         e_cutoff=args.e_cutoff,
                                                                                         use_hard_labels=args.hard_label)
 
+
                 total_loss = sup_loss + self.lambda_u * unsup_loss
 
                 pseudo_labels_acc.append(pseudo_lb[mask_raw])
@@ -257,13 +258,13 @@ class EnergyMatch:
                         (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
                     self.save_model('latest_model.pth', save_path)
 
-            if self.it % 100 == 0:
-                pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes)
+            if self.it % 50 == 0:
+               pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes)
 
-                tb_dict.update(pr_dict)
-                pseudo_labels_acc = []
-                true_labels_acc = []
-                all_true_labels_acc = []
+               tb_dict.update(pr_dict)
+               pseudo_labels_acc = []
+               true_labels_acc = []
+               all_true_labels_acc = []
 
 
             if self.it % self.num_eval_iter == 0:

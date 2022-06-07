@@ -218,23 +218,30 @@ class FixMatch:
                 T = self.t_fn(self.it)
                 p_cutoff = self.p_fn(self.it)
 
-                energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
-                scores_ulb.append(F.softmax(logits_x_ulb_w, dim=-1).detach())
-                label_ulb.append(y_ulb)
-                energy_ulb.append(energy)
+                # out_prob = []
+                # out_prob_nl = []
+                # with torch.no_grad():
+                #     for _ in range(10):
+                #         outputs = self.model(x_ulb_w)
+                #         out_prob.append(F.softmax(outputs, dim=1)) #for selecting positive pseudo-labels
+                # out_prob = torch.stack(out_prob)
+                # out_std = torch.std(out_prob, dim=0)
+                # out_prob = torch.mean(out_prob, dim=0)
+                # max_value, max_idx = torch.max(out_prob, dim=1)
+                # max_std = out_std.gather(1, max_idx.view(-1,1))
+
 
                 unsup_loss, mask, select, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
                                                                        logits_x_ulb_w,
-                                                                       'ce', T, p_cutoff,
+                                                                       'ce', T, p_cutoff, #max_std.squeeze(1),
                                                                        use_hard_labels=args.hard_label)
-
+                pseudo_labels_acc.append(pseudo_lb[mask_raw])
+                true_labels_acc.append(y_ulb[mask_raw])
+                all_true_labels_acc.append(y_ulb)
 
 
                 total_loss = sup_loss + self.lambda_u * unsup_loss
 
-                pseudo_labels_acc.append(pseudo_lb[mask_raw])
-                true_labels_acc.append(y_ulb[mask_raw])
-                all_true_labels_acc.append(y_ulb)
 
             # parameter updates
             if args.amp:
@@ -273,13 +280,14 @@ class FixMatch:
                         (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
                     self.save_model('latest_model.pth', save_path)
 
-            if self.it % 100 == 0:
+            if self.it % 50 == 0:
                 pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes)
 
                 tb_dict.update(pr_dict)
                 pseudo_labels_acc = []
                 true_labels_acc = []
                 all_true_labels_acc = []
+
 
             if self.it % self.num_eval_iter == 0:
 

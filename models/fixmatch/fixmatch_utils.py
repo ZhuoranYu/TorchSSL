@@ -14,7 +14,9 @@ class Get_Scalar:
         return self.value
 
 
-def consistency_loss(logits_s, logits_w, name='ce', T=1.0, p_cutoff=0.0, use_hard_labels=True):
+def consistency_loss(logits_s, logits_w, name='ce', T=1.0, p_cutoff=0.0, 
+                                                    # std=None, 
+                                                    use_hard_labels=True):
     assert name in ['ce', 'L2']
     logits_w = logits_w.detach()
     if name == 'L2':
@@ -29,6 +31,9 @@ def consistency_loss(logits_s, logits_w, name='ce', T=1.0, p_cutoff=0.0, use_har
         max_probs, max_idx = torch.max(pseudo_label, dim=-1)
         mask_raw = max_probs.ge(p_cutoff)
         mask = mask_raw.float()
+
+        # mask_std = (std < 0.05).float()
+
         select = max_probs.ge(p_cutoff).long()
         # strong_prob, strong_idx = torch.max(torch.softmax(logits_s, dim=-1), dim=-1)
         # strong_select = strong_prob.ge(p_cutoff).long()
@@ -37,7 +42,7 @@ def consistency_loss(logits_s, logits_w, name='ce', T=1.0, p_cutoff=0.0, use_har
             masked_loss = ce_loss(logits_s, max_idx, use_hard_labels, reduction='none') * mask
         else:
             pseudo_label = torch.softmax(logits_w / T, dim=-1)
-            masked_loss = ce_loss(logits_s, pseudo_label, use_hard_labels) * mask
+            masked_loss = ce_loss(logits_s, pseudo_label, use_hard_labels) * mask # * mask_std
         return masked_loss.mean(), mask.mean(), select, max_idx.long(), mask_raw
 
     else:

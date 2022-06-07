@@ -125,6 +125,10 @@ class FlexMatch:
 
         classwise_acc = torch.zeros((args.num_classes,)).cuda(args.gpu)
 
+        pseudo_labels_acc = []
+        true_labels_acc = []
+        all_true_labels_acc = []
+
         for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s) in zip(self.loader_dict['train_lb'],
                                                                   self.loader_dict['train_ulb']):
             # prevent the training iterations exceed args.num_train_iter
@@ -168,7 +172,7 @@ class FlexMatch:
                 T = self.t_fn(self.it)
                 p_cutoff = self.p_fn(self.it)
 
-                unsup_loss, mask, select, pseudo_lb, p_model = consistency_loss(logits_x_ulb_s,
+                unsup_loss, mask, select, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
                                                                                 logits_x_ulb_w,
                                                                                 classwise_acc,
                                                                                 p_target,
@@ -176,6 +180,11 @@ class FlexMatch:
                                                                                 'ce', T, p_cutoff,
                                                                                 use_hard_labels=args.hard_label,
                                                                                 use_DA=args.use_DA)
+                
+                pseudo_labels_acc.append(pseudo_lb[mask_raw])
+                true_labels_acc.append(y_ulb[mask_raw])
+                all_true_labels_acc.append(y_ulb)
+
 
                 if x_ulb_idx[select == 1].nelement() != 0:
                     selected_label[x_ulb_idx[select == 1]] = pseudo_lb[select == 1]
@@ -218,6 +227,14 @@ class FlexMatch:
                 if not args.multiprocessing_distributed or \
                         (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
                     self.save_model('latest_model.pth', save_path)
+
+            if self.it % 50 == 0:
+                pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes)
+
+                tb_dict.update(pr_dict)
+                pseudo_labels_acc = []
+                true_labels_acc = []
+                all_true_labels_acc = []
 
             if self.it % self.num_eval_iter == 0:
                 eval_dict = self.evaluate(args=args)

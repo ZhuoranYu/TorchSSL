@@ -58,12 +58,17 @@ def sample_long_tail_data(imb_ratio_lb, imb_ratio_ulb, num_classes, labeled_perc
     lb_targets = []
     ulb_data = []
     ulb_targets = []
+    num_labels_first = -1
     for c in range(num_classes):
         idx = np.where(target == c)[0]
         lb_num_samples = int(idx.shape[0] * sample_per_class_percentage_lb[c] * (labeled_percentage / 100.0))
-        ulb_num_samples = int((idx.shape[0] - lb_num_samples) * sample_per_class_percentage_ulb[c])
-        lb_idx = np.random.choice(idx, lb_num_samples, False)
-        ulb_idx = np.random.choice(idx, ulb_num_samples, False)
+        if c == 0:
+            num_labels_first = lb_num_samples
+        ulb_num_samples = int((idx.shape[0] - num_labels_first) * sample_per_class_percentage_ulb[c])
+
+        sampled_idx = np.random.choice(idx, lb_num_samples + ulb_num_samples, False)
+        lb_idx = sampled_idx[:lb_num_samples]
+        ulb_idx = sampled_idx[lb_num_samples:]
 
         lb_data.extend(data[lb_idx])
         lb_targets.extend(target[lb_idx])
