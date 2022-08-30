@@ -1,4 +1,4 @@
-save_dir: ./saved_models
+save_dir: ./large_scale
 save_name: fixmatch_imagenet_100000_0
 resume: False
 load_path: None

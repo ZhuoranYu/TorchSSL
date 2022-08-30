@@ -49,6 +49,8 @@ def analyze_pseudo_pr(pseudo_labels, true_labels, all_true_labels, num_classes):
     pr_dict[f'pseudo-f1/overall'] = f1_overall
     pr_dict['count/overall'] = pseudo_labels.shape[0]
 
+    #print(overall_tp.cpu().item(), pseudo_labels.shape[0], precision_overall)
+
 
     head_mask_pseudo = torch.logical_or(torch.logical_or(pseudo_labels==0, pseudo_labels==1), pseudo_labels==2)
     body_mask_pseudo = torch.logical_or(torch.logical_or(torch.logical_or(pseudo_labels == 3, pseudo_labels == 4), pseudo_labels == 5), pseudo_labels == 6)

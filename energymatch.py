@@ -354,6 +354,9 @@ if __name__ == "__main__":
     parser.add_argument('--imb_ratio_ulb', type=int, default=100)
     parser.add_argument('--labeled_percentage', type=float, default=10)
 
+    parser.add_argument('--ood_percentage', type=float, default=0.25)
+
+
     parser.add_argument('--x1', default=0.5, type=float)
     parser.add_argument('--y1', default=-7.5, type=float)
     parser.add_argument('--x2', default=1.0, type=float)

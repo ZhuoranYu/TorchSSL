@@ -1,12 +1,12 @@
-save_dir: ./ood
-save_name: energy_cifar10_40_0_thres8.75_T2.0
+save_dir: ./new_analysis
+save_name: energy_cifar10_40_0_thres11
 resume: False
 load_path: None
 overwrite: True
 use_tensorboard: True
 epoch: 1
 num_train_iter: 1048576
-num_eval_iter: 50
+num_eval_iter: 5000
 num_labels: 40
 batch_size: 64
 eval_batch_size: 1024
@@ -40,7 +40,7 @@ multiprocessing_distributed: False
 dist_url: tcp://127.0.0.1:10006
 dist_backend: nccl
 gpu: 0
-e_cutoff: -8.0
+e_cutoff: -11.0
 joint_conf: False
 x1: 0.5
 y1: -9

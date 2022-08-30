@@ -10,6 +10,13 @@ import os
 
 from datasets.DistributedProxySampler import DistributedProxySampler
 
+def split_ssl_ood_data(args, data, target, num_classes):
+    data, target = np.array(data), np.array(target)
+    lb_data, lb_targets, ulb_data, ulb_targets = sample_ood_data(args.ood_percentage, num_classes,
+                                                                args.num_labels, data, target)
+    return lb_data, lb_targets, ulb_data, ulb_targets
+
+
 def split_ssl_data_lt(args, data, target, num_classes):
     '''
         split data into labeled and unlabeled in the long-tail scenario
@@ -36,6 +43,42 @@ def split_ssl_data(args, data, target, num_labels, num_classes, index=None, incl
         return lb_data, lbs, data, target
     else:
         return lb_data, lbs, data[ulb_idx], target[ulb_idx]
+
+def sample_ood_data(ood_percentage, num_classes, num_labels, data, target):
+    animals = [2, 3, 4, 5, 6, 7]
+    ood = [0, 1, 8, 9]
+
+    num_mismatch = int(ood_percentage * 4)
+    lb_data = []
+    lb_targets = []
+    ulb_data = []
+    ulb_targets = []
+
+    for mapped_idx, c_idx in enumerate(animals):
+        idx = np.where(target == c_idx)[0] # find instances for in distribution class
+        if mapped_idx < 4 - num_mismatch:
+            total_samples = idx.shape[0]
+        else:
+            total_samples = num_labels
+
+        idx = np.random.choice(idx, total_samples, False)
+        lb_idx = idx[:num_labels]
+        lb_data.extend(data[lb_idx])
+        lb_targets.extend(target[lb_idx])
+
+        if num_labels != total_samples:
+            ulb_idx = idx[num_labels:]
+            ulb_data.extend(data[ulb_idx])
+            ulb_targets.extend(target[ulb_idx])
+
+    for idx, c in enumerate(ood):
+        if idx >= num_mismatch:
+            break
+        idx = np.where(target == c)[0]
+        ulb_data.extend(data[idx])
+        ulb_targets.extend(target[idx])
+
+    return lb_data, lb_targets, ulb_data, ulb_targets
 
 
 def sample_long_tail_data(imb_ratio_lb, imb_ratio_ulb, num_classes, labeled_percentage, data, target):

@@ -1,5 +1,5 @@
-save_dir: ./saved_models
-save_name: fixmatch_cifar10_40_0
+save_dir: ./new_analysis
+save_name: fixmatch_cifar10_40
 resume: False
 load_path: None
 overwrite: True

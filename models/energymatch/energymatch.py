@@ -302,6 +302,8 @@ class EnergyMatch:
 
     @torch.no_grad()
     def evaluate(self, eval_loader=None, args=None):
+        animals = [2, 3, 4, 5, 6, 7]
+
         self.model.eval()
         self.ema.apply_shadow()
         if eval_loader is None:
@@ -321,7 +323,10 @@ class EnergyMatch:
             y_pred.extend(torch.max(logits, dim=-1)[1].cpu().tolist())
             y_logits.extend(torch.softmax(logits, dim=-1).cpu().tolist())
             total_loss += loss.detach() * num_batch
-        top1 = accuracy_score(y_true, y_pred)
+
+        per_cls_acc = confusion_matrix(y_true, y_pred, normalize='true').diagonal()[animals]
+        top1 = per_cls_acc.mean()
+        #top1 = accuracy_score(y_true, y_pred)
         top5 = top_k_accuracy_score(y_true, y_logits, k=5)
         precision = precision_score(y_true, y_pred, average='macro')
         recall = recall_score(y_true, y_pred, average='macro')

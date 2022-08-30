@@ -1,6 +1,6 @@
 import torch
 
-from .data_utils import split_ssl_data, sample_labeled_data, split_ssl_data_lt
+from .data_utils import split_ssl_data, sample_labeled_data, split_ssl_data_lt, split_ssl_ood_data
 from .dataset import BasicDataset
 from collections import Counter
 import torchvision
@@ -95,7 +95,7 @@ class ImagenetDataset(torchvision.datasets.ImageFolder):
         if self.target_transform is not None:
             target = self.target_transform(target)
         return (index, sample_transformed, target) if not self.ulb else (
-            index, sample_transformed, self.strong_transform(sample))
+            index, sample_transformed, self.strong_transform(sample), target)
 
     def make_dataset(
             self,
@@ -212,12 +212,20 @@ class SSL_Dataset:
         """
         self.args = args
         self.alg = alg
-        self.name = name
+        if name == 'cifar10-ood':
+            self.name = 'cifar10'
+            self.ood = True
+        else:
+            self.name = name
+            self.ood = False
         self.train = train
         self.num_classes = num_classes
         self.data_dir = data_dir
         crop_size = 96 if self.name.upper() == 'STL10' else 224 if self.name.upper() == 'IMAGENET' else 32
-        self.transform = get_transform(mean[name], std[name], crop_size, train)
+        if name == 'cifar10-ood':
+            self.transform = get_transform(mean['cifar10'], std['cifar10'], crop_size, train)
+        else:
+            self.transform = get_transform(mean[name], std[name], crop_size, train)
 
     def get_data(self, svhn_extra=True):
         """
@@ -306,6 +314,9 @@ class SSL_Dataset:
                 ulb_data = np.concatenate([ulb_data, lb_data], axis=0)
             lb_data, lb_targets, _ = sample_labeled_data(self.args, lb_data, lb_targets, num_labels, self.num_classes)
             ulb_targets = None
+        if self.name.upper() == 'CIFAR10' and self.ood:
+            data, targets = self.get_data()
+            lb_data, lb_targets, ulb_data, ulb_targets = split_ssl_ood_data(self.args, data, targets, self.num_classes)
         else:
             data, targets = self.get_data()
 

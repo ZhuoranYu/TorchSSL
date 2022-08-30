@@ -84,7 +84,7 @@ class BasicDataset(Dataset):
                 if self.alg == 'fixmatch':
                     return idx, img_w, self.strong_transform(img), target
                 elif self.alg == 'flexmatch':
-                    return idx, img_w, self.strong_transform(img)
+                    return idx, img_w, self.strong_transform(img), target
                 elif self.alg == 'pimodel':
                     return idx, img_w, self.transform(img)
                 elif self.alg == 'pseudolabel':

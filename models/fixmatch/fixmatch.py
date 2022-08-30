@@ -325,6 +325,7 @@ class FixMatch:
 
     @torch.no_grad()
     def evaluate(self, eval_loader=None, args=None):
+        animals = [2, 3, 4, 5, 6, 7]
         self.model.eval()
         self.ema.apply_shadow()
         if eval_loader is None:
@@ -350,7 +351,9 @@ class FixMatch:
         pred_mino = torch.tensor(y_pred)[minority_mask].tolist()
         minority_acc = accuracy_score(y_mino, pred_mino)
 
-        top1 = accuracy_score(y_true, y_pred)
+        per_cls_acc = confusion_matrix(y_true, y_pred, normalize='true').diagonal()[animals]
+        top1 = per_cls_acc.mean()
+        #top1 = accuracy_score(y_true, y_pred)
         top5 = top_k_accuracy_score(y_true, y_logits, k=5)
 
         cf_mat = confusion_matrix(y_true, y_pred, normalize='true')

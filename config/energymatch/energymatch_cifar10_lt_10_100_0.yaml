@@ -1,5 +1,5 @@
-save_dir: ./ood_longtail
-save_name: energy_cifar10_lt_100_100_0_thres9
+save_dir: ./cifar_lt
+save_name: energy_cifar10_lt_200_2_thres9.5
 resume: False
 load_path: None
 overwrite: True
@@ -34,7 +34,7 @@ train_sampler: RandomSampler
 num_classes: 10
 num_workers: 1
 alg: energymatch
-seed: 0
+seed: 2
 world_size: 1
 rank: 0
 multiprocessing_distributed: False
@@ -42,12 +42,7 @@ dist_url: tcp://127.0.0.1:10006
 dist_backend: nccl
 gpu: 0
 long_tail: True
-imb_ratio_lb: 100
-imb_ratio_ulb: 100
+imb_ratio_lb: 200
+imb_ratio_ulb: 200
 labeled_percentage: 10
-e_cutoff: -8.75
-x1: 0.5
-y1: -7.5
-x2: 1.0
-y2: -20.0
-degree: 10
+e_cutoff: -9.5

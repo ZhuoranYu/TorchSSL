@@ -1,5 +1,5 @@
 save_dir: ./saved_models
-save_name: flexmatch_cifar10_40_0
+save_name: flexmatch_cifar10_40_0_energy_7
 resume: False
 load_path: None
 overwrite: True
@@ -12,7 +12,7 @@ batch_size: 64
 eval_batch_size: 1024
 hard_label: True
 T: 0.5
-p_cutoff: 0.95
+p_cutoff: -7
 ulb_loss_ratio: 1.0
 uratio: 7
 ema_m: 0.999
@@ -36,7 +36,7 @@ alg: flexmatch
 seed: 0
 world_size: 1
 rank: 0
-multiprocessing_distributed: True
+multiprocessing_distributed: False
 dist_url: tcp://127.0.0.1:10001
 dist_backend: nccl
-gpu: None
+gpu: 0

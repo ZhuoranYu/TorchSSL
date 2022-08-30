@@ -342,6 +342,8 @@ if __name__ == "__main__":
     parser.add_argument('--imb_ratio_ulb', type=int, default=100)
     parser.add_argument('--labeled_percentage', type=float, default=10)
 
+    parser.add_argument('--ood_percentage', type=float, default=0.25)
+
     args = parser.parse_args()
     over_write_args_from_file(args, args.c)
     main(args)

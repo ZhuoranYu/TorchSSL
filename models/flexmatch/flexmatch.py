@@ -17,6 +17,7 @@ from train_utils import ce_loss, wd_loss, EMA, Bn_Controller
 
 from sklearn.metrics import *
 from copy import deepcopy
+from analyze_utils import *
 
 
 class FlexMatch:
@@ -91,16 +92,16 @@ class FlexMatch:
             self.ema.load(self.ema_model)
 
         # p(y) based on the labeled examples seen during training
-        dist_file_name = r"./data_statistics/" + args.dataset + '_' + str(args.num_labels) + '.json'
-        if args.dataset.upper() == 'IMAGENET':
-            p_target = None
-        else:
-            with open(dist_file_name, 'r') as f:
-                p_target = json.loads(f.read())
-                p_target = torch.tensor(p_target['distribution'])
-                p_target = p_target.cuda(args.gpu)
+        #dist_file_name = r"./data_statistics/" + args.dataset + '_' + str(args.num_labels) + '.json'
+        #if args.dataset.upper() == 'IMAGENET':
+        #    p_target = None
+        #else:
+        #    with open(dist_file_name, 'r') as f:
+        #        p_target = json.loads(f.read())
+        #        p_target = torch.tensor(p_target['distribution'])
+        #        p_target = p_target.cuda(args.gpu)
             # print('p_target:', p_target)
-
+        p_target = None
         p_model = None
 
         # for gpu profiling
@@ -129,7 +130,7 @@ class FlexMatch:
         true_labels_acc = []
         all_true_labels_acc = []
 
-        for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s) in zip(self.loader_dict['train_lb'],
+        for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s, y_ulb) in zip(self.loader_dict['train_lb'],
                                                                   self.loader_dict['train_ulb']):
             # prevent the training iterations exceed args.num_train_iter
             if self.it > args.num_train_iter:
@@ -146,6 +147,7 @@ class FlexMatch:
             x_lb, x_ulb_w, x_ulb_s = x_lb.cuda(args.gpu), x_ulb_w.cuda(args.gpu), x_ulb_s.cuda(args.gpu)
             x_ulb_idx = x_ulb_idx.cuda(args.gpu)
             y_lb = y_lb.cuda(args.gpu)
+            y_ulb = y_ulb.cuda(args.gpu)
 
             pseudo_counter = Counter(selected_label.tolist())
             if max(pseudo_counter.values()) < len(self.ulb_dset):  # not all(5w) -1
@@ -158,7 +160,6 @@ class FlexMatch:
                         wo_negative_one.pop(-1)
                     for i in range(args.num_classes):
                         classwise_acc[i] = pseudo_counter[i] / max(wo_negative_one.values())
-
             inputs = torch.cat((x_lb, x_ulb_w, x_ulb_s))
 
             # inference and calculate sup/unsup losses
@@ -179,8 +180,7 @@ class FlexMatch:
                                                                                 p_model,
                                                                                 'ce', T, p_cutoff,
                                                                                 use_hard_labels=args.hard_label,
-                                                                                use_DA=args.use_DA)
-                
+                                                                                use_DA=args.use_DA) 
                 pseudo_labels_acc.append(pseudo_lb[mask_raw])
                 true_labels_acc.append(y_ulb[mask_raw])
                 all_true_labels_acc.append(y_ulb)
@@ -266,6 +266,8 @@ class FlexMatch:
 
     @torch.no_grad()
     def evaluate(self, eval_loader=None, args=None):
+        animals = [2, 3, 4, 5, 6, 7]
+
         self.model.eval()
         self.ema.apply_shadow()
         if eval_loader is None:
@@ -285,7 +287,9 @@ class FlexMatch:
             y_pred.extend(torch.max(logits, dim=-1)[1].cpu().tolist())
             y_logits.extend(torch.softmax(logits, dim=-1).cpu().tolist())
             total_loss += loss.detach() * num_batch
-        top1 = accuracy_score(y_true, y_pred)
+        per_cls_acc = confusion_matrix(y_true, y_pred, normalize='true').diagonal()[animals]
+        top1 = per_cls_acc.mean()
+        #top1 = accuracy_score(y_true, y_pred)
         top5 = top_k_accuracy_score(y_true, y_logits, k=5)
         precision = precision_score(y_true, y_pred, average='macro')
         recall = recall_score(y_true, y_pred, average='macro')

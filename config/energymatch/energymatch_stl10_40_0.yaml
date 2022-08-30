@@ -1,5 +1,5 @@
-save_dir: ./ood
-save_name: energymatch_stl10_40_0
+save_dir: ./main_results
+save_name: energymatch_stl10_250_2_thres8
 resume: False
 load_path: None
 overwrite: True
@@ -7,14 +7,14 @@ use_tensorboard: True
 epoch: 1
 num_train_iter: 1048576
 num_eval_iter: 5000
-num_labels: 40
+num_labels: 250
 batch_size: 64
 eval_batch_size: 1024
 hard_label: True
 T: 0.5
 p_cutoff: 0.95
 ulb_loss_ratio: 1.0
-uratio: 1
+uratio: 7
 ema_m: 0.999
 optim: SGD
 lr: 0.03
@@ -33,12 +33,12 @@ train_sampler: RandomSampler
 num_classes: 10
 num_workers: 1
 alg: fixmatch
-seed: 0
+seed: 2
 world_size: 1
 rank: 0
 multiprocessing_distributed: False
 dist_url: tcp://127.0.0.1:10009
 dist_backend: nccl
 gpu: 0
-e_cutoff: -9.0
+e_cutoff: -8.0
 
