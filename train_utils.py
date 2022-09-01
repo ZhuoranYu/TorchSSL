@@ -420,15 +420,15 @@ class EMAN:
         model_dict = self.model.state_dict()
         for name, param in model_dict.items():
             assert name in self.shadow
-            self.backup[name] = param.data
-            param.data = self.shadow[name]
+            self.backup[name] = param.data.clone()
+
+        self.model.load_state_dict(self.shadow) # load the ema model
+
 
     def restore(self):
-        model_dict = self.model.state_dict()
-        for name, param in model_dict.items():
-            assert name in self.backup
-            param.data = self.backup[name]
+        self.model.load_state_dict(self.backup) # load the saved student model
         self.backup = {}
+
 
 
 class Bn_Controller:
