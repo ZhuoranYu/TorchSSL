@@ -385,6 +385,52 @@ class EMA:
         self.backup = {}
 
 
+class EMAN:
+    """
+    Implementation from https://fyubang.com/2019/06/01/ema/
+    """
+
+    def __init__(self, model, decay):
+        self.model = model
+        self.decay = decay
+        self.shadow = {}
+        self.backup = {}
+
+    def load(self, ema_model):
+        model_dict = ema_model.state_dict()
+        for name, param in model_dict.items():
+            self.shadow[name] = param.data.clone()
+
+    def register(self):
+        model_dict = self.model.state_dict()
+        for name, param in model_dict.items():
+            self.shadow[name] = param.data.clone()
+
+    def update(self):
+        model_dict = self.model.state_dict()
+        for name, param in model_dict.items():
+            assert name in self.shadow
+            if 'num_batches_tracked' in name:
+                new_average = param.data
+            else:
+                new_average = (1.0 - self.decay) * param.data + self.decay * self.shadow[name]
+            self.shadow[name] = new_average.clone()
+
+    def apply_shadow(self):
+        model_dict = self.model.state_dict()
+        for name, param in model_dict.items():
+            assert name in self.shadow
+            self.backup[name] = param.data
+            param.data = self.shadow[name]
+
+    def restore(self):
+        model_dict = self.model.state_dict()
+        for name, param in model_dict.items():
+            assert name in self.backup
+            param.data = self.backup[name]
+        self.backup = {}
+
+
 class Bn_Controller:
     def __init__(self):
         """
