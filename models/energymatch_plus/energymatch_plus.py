@@ -44,14 +44,14 @@ class EnergyMatchPlus:
         # momentum update param
         self.loader = {}
         self.num_classes = num_classes
-        self.ema_m = ema_m
+        self.momentum = ema_m
 
         # create the encoders
         # network is builded only by num_classes,
         # other configs are covered in main.py
 
         self.model = net_builder(num_classes=num_classes)
-        self.ema_model = None
+        self.ema_model = deepcopy(self.model)
 
         self.num_eval_iter = num_eval_iter
         self.t_fn = Get_Scalar(T)  # temperature params function
@@ -141,16 +141,24 @@ class EnergyMatchPlus:
             os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
             df.to_csv(f'{dataset}_track/{self.it // 1000}k/class_{c}_real.csv', index=False)
 
+    def momentum_update_ema(self):
+        state_dict_main = self.model.state_dict()
+        state_dict_ema = self.ema_model.state_dict()
+        for (k_main, v_main), (k_ema, v_ema) in zip(state_dict_main.items(), state_dict_ema.items()):
+            assert k_main == k_ema, "state_dict names are different!"
+            assert v_main.shape == v_ema.shape, "state_dict shapes are different!"
+            if 'num_batches_tracked' in k_ema:
+                v_ema.copy_(v_main)
+            else:
+                v_ema.copy_(v_ema * self.momentum + (1. - self.momentum) * v_main)
+
     def train(self, args, logger=None):
 
         ngpus_per_node = torch.cuda.device_count()
 
         # EMA Init
         self.model.train()
-        self.ema = EMAN(self.model, self.ema_m)
-        self.ema.register()
-        if args.resume == True:
-            self.ema.load(self.ema_model)
+        self.ema_model.eval()
 
         # for gpu profiling
         start_batch = torch.cuda.Event(enable_timing=True)
@@ -213,11 +221,7 @@ class EnergyMatchPlus:
 
             # inference and calculate sup/unsup losses
             with amp_cm():
-                self.model.eval()
-                self.ema.apply_shadow()
-                logits_x_ulb_w = self.model(x_ulb_w)
-                self.ema.restore()
-                self.model.train()
+                logits_x_ulb_w = self.ema_model(x_ulb_w)
 
                 logits = self.model(inputs)
                 logits_x_lb = logits[:num_lb]
@@ -228,6 +232,7 @@ class EnergyMatchPlus:
                                                                                         logits_x_ulb_w,
                                                                                         e_cutoff=args.e_cutoff,
                                                                                         use_hard_labels=args.hard_label)
+
 
                 total_loss = sup_loss + self.lambda_u * unsup_loss
 
@@ -250,8 +255,8 @@ class EnergyMatchPlus:
                 self.optimizer.step()
 
             self.scheduler.step()
-            self.ema.update()
             self.model.zero_grad()
+            self.momentum_update_ema()
 
             end_run.record()
             torch.cuda.synchronize()
@@ -294,7 +299,7 @@ class EnergyMatchPlus:
                     best_it = self.it
 
                 self.print_fn(
-                    f"{self.it} iteration, USE_EMA: {self.ema_m != 0}, {tb_dict}, BEST_EVAL_ACC: {best_eval_acc}, at {best_it} iters")
+                    f"{self.it} iteration, USE_EMA: {self.momentum != 0}, {tb_dict}, BEST_EVAL_ACC: {best_eval_acc}, at {best_it} iters")
 
                 if not args.multiprocessing_distributed or \
                         (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
@@ -317,8 +322,6 @@ class EnergyMatchPlus:
 
     @torch.no_grad()
     def evaluate(self, eval_loader=None, args=None):
-        self.model.eval()
-        self.ema.apply_shadow()
         if eval_loader is None:
             eval_loader = self.loader_dict['eval']
         total_loss = 0.0
@@ -330,7 +333,7 @@ class EnergyMatchPlus:
             x, y = x.cuda(args.gpu), y.cuda(args.gpu)
             num_batch = x.shape[0]
             total_num += num_batch
-            logits = self.model(x)
+            logits = self.ema_model(x)
             loss = F.cross_entropy(logits, y, reduction='mean')
             y_true.extend(y.cpu().tolist())
             y_pred.extend(torch.max(logits, dim=-1)[1].cpu().tolist())
@@ -345,25 +348,18 @@ class EnergyMatchPlus:
 
         cf_mat = confusion_matrix(y_true, y_pred, normalize='true')
         self.print_fn('confusion matrix:\n' + np.array_str(cf_mat))
-        self.ema.restore()
-        self.model.train()
         return {'eval/loss': total_loss / total_num, 'eval/top-1-acc': top1, 'eval/top-5-acc': top5,
                 'eval/precision': precision, 'eval/recall': recall, 'eval/F1': F1, 'eval/AUC': AUC}
 
     def save_model(self, save_name, save_path):
         save_filename = os.path.join(save_path, save_name)
         # copy EMA parameters to ema_model for saving with model as temp
-        self.model.eval()
-        self.ema.apply_shadow()
-        ema_model = self.model.state_dict()
-        self.ema.restore()
-        self.model.train()
 
         torch.save({'model': self.model.state_dict(),
                     'optimizer': self.optimizer.state_dict(),
                     'scheduler': self.scheduler.state_dict(),
                     'it': self.it,
-                    'ema_model': ema_model},
+                    'ema_model': self.ema_model.state_dict()},
                    save_filename)
 
         self.print_fn(f"model saved: {save_filename}")
