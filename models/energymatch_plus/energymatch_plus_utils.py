@@ -21,9 +21,15 @@ def interpolation(x1, y1, x2, y2, k):
 
     return alpha, beta
 
+def debiasing(current_logit, qhat, tau=0.5):
+    debiased_logits = current_logit - tau * torch.log(qhat)
+    return debiased_logits
 
-def consistency_loss(logits_s, logits_w, e_cutoff=-8.75, use_hard_labels=True):
+def consistency_loss(logits_s, logits_w, qhat, e_cutoff=-8.75, use_hard_labels=True):
     logits_w = logits_w.detach()
+
+    # add debiasing before computing energy
+    logits_w = debiasing(logits_w, qhat)
 
     energy = -torch.logsumexp(logits_w, dim=1)
     pseudo_label = torch.softmax(logits_w, dim=-1)
@@ -33,6 +39,10 @@ def consistency_loss(logits_s, logits_w, e_cutoff=-8.75, use_hard_labels=True):
 
     mask = mask_raw.float()
     select = max_probs[mask_raw]
+
+    # adaptive marginal loss
+    delta_logits = torch.log(qhat)
+    logits_s = logits_s + 0.5 * delta_logits
 
     if use_hard_labels:
         masked_loss = ce_loss(logits_s, max_idx, use_hard_labels, reduction='none') * mask
