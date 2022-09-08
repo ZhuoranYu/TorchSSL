@@ -19,6 +19,8 @@ from analyze_utils import *
 from sklearn.metrics import *
 from copy import deepcopy
 
+import wandb
+
 
 class EnergyMatchPlus:
     def __init__(self, net_builder, num_classes, ema_m, T, p_cutoff, lambda_u, \
@@ -57,7 +59,6 @@ class EnergyMatchPlus:
         self.t_fn = Get_Scalar(T)  # temperature params function
         self.p_fn = Get_Scalar(p_cutoff)  # confidence cutoff function
         self.lambda_u = lambda_u
-        self.tb_log = tb_log
         self.use_hard_label = hard_label
 
         self.optimizer = None
@@ -187,7 +188,11 @@ class EnergyMatchPlus:
 
         self.initial_qhat(class_num=self.num_classes)
 
-        for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s) in zip(self.loader_dict['train_lb'],
+        pseudo_labels_acc = []
+        true_labels_acc = []
+        all_true_labels_acc = []
+
+        for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s, y_ulb) in zip(self.loader_dict['train_lb'],
                                                                   self.loader_dict['train_ulb']):
 
             # prevent the training iterations exceed args.num_train_iter
@@ -203,6 +208,7 @@ class EnergyMatchPlus:
             assert num_ulb == x_ulb_s.shape[0]
             x_lb, x_ulb_w, x_ulb_s = x_lb.cuda(args.gpu), x_ulb_w.cuda(args.gpu), x_ulb_s.cuda(args.gpu)
             y_lb = y_lb.cuda(args.gpu)
+            y_ulb = y_ulb.cuda(args.gpu)
 
             pseudo_counter = Counter(selected_label.tolist())
             if max(pseudo_counter.values()) < len(self.ulb_dset):  # not all(5w) -1
@@ -219,13 +225,37 @@ class EnergyMatchPlus:
                 sup_loss = ce_loss(logits_x_lb, y_lb, reduction='mean')
 
                 self.update_qhat(torch.softmax(logits_x_ulb_w.detach(), dim=-1))
+
+                if args.dynamic:
+                    energy_lb = -torch.logsumexp(logits_x_lb, dim=1)
+                    if not args.per_cls: # if use a uniform dynamic threshold
+                        threshold = energy_lb.mean().data.item()
+                    else: # if we use a class-specific dynamic threshold
+                        threshold = torch.zeros(args.num_classes, device=energy_lb.device)
+                        for c in range(args.num_classes):
+                            c_mask = (y_lb == c)
+                            energy_lb_c = energy_lb[c_mask]
+                            threshold[c] = energy_lb_c.mean().data.item()
+
+                else:
+                    threshold = args.e_cutoff
+
+                if self.it < 10:
+                    threshold = None
+
                 unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
                                                                                         logits_x_ulb_w,
                                                                                         self.qhat,
-                                                                                        e_cutoff=args.e_cutoff,
+                                                                                        e_cutoff=threshold,
+                                                                                        debias=args.debias,
+                                                                                        tau=args.tau,
                                                                                         use_hard_labels=args.hard_label)
 
                 total_loss = sup_loss + self.lambda_u * unsup_loss
+
+                pseudo_labels_acc.append(pseudo_lb[mask_raw])
+                true_labels_acc.append(y_ulb[mask_raw])
+                all_true_labels_acc.append(y_ulb)
 
 
             # parameter updates
@@ -253,7 +283,7 @@ class EnergyMatchPlus:
             tb_dict['train/sup_loss'] = sup_loss.detach()
             tb_dict['train/unsup_loss'] = unsup_loss.detach()
             tb_dict['train/total_loss'] = total_loss.detach()
-            tb_dict['train/mask_ratio'] = 1.0 - mask.detach()
+            tb_dict['train/num_pseudo'] = mask
             tb_dict['lr'] = self.optimizer.param_groups[0]['lr']
             tb_dict['train/prefecth_time'] = start_batch.elapsed_time(end_batch) / 1000.
             tb_dict['train/run_time'] = start_run.elapsed_time(end_run) / 1000.
@@ -266,18 +296,16 @@ class EnergyMatchPlus:
                     self.save_model('latest_model.pth', save_path)
 
             if self.it % self.num_eval_iter == 0:
-                # prob_prec_dict = analyze_prob(select_scores, pseudo_lb[mask_raw], y_ulb[mask_raw])
-                # tb_dict.update(prob_prec_dict)
 
                 eval_dict = self.evaluate(args=args)
                 tb_dict.update(eval_dict)
 
-                # pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes)
-                #
-                # tb_dict.update(pr_dict)
-                # pseudo_labels_acc = []
-                # true_labels_acc = []
-                # all_true_labels_acc = []
+                pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes)
+
+                tb_dict.update(pr_dict)
+                pseudo_labels_acc = []
+                true_labels_acc = []
+                all_true_labels_acc = []
 
                 save_path = os.path.join(args.save_dir, args.save_name)
 
@@ -294,8 +322,7 @@ class EnergyMatchPlus:
                     if self.it == best_it:
                         self.save_model('model_best.pth', save_path)
 
-                    if not self.tb_log is None:
-                        self.tb_log.update(tb_dict, self.it)
+                    wandb.log(tb_dict, self.it)
 
             self.it += 1
             del tb_dict

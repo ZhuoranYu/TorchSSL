@@ -18,6 +18,7 @@ from models.energymatch_plus.energymatch_plus import EnergyMatchPlus
 from datasets.ssl_dataset import SSL_Dataset, ImageNetLoader
 from datasets.data_utils import get_data_loader
 
+import wandb
 
 def main(args):
     '''
@@ -95,9 +96,8 @@ def main_worker(gpu, ngpus_per_node, args):
     # SET save_path and logger
     save_path = os.path.join(args.save_dir, args.save_name)
     logger_level = "WARNING"
-    tb_log = None
     if args.rank % ngpus_per_node == 0:
-        tb_log = TBLog(save_path, 'tensorboard', use_tensorboard=args.use_tensorboard)
+        wandb.init(project="EnergyMatch", entity="zyu336", name=args.save_name)
         logger_level = "INFO"
 
     logger = get_logger(args.save_name, save_path, logger_level)
@@ -128,7 +128,6 @@ def main_worker(gpu, ngpus_per_node, args):
                      args.ulb_loss_ratio,
                      args.hard_label,
                      num_eval_iter=args.num_eval_iter,
-                     tb_log=tb_log,
                      logger=logger)
 
     logger.info(f'Number of Trainable Params: {count_parameters(model.model)}')
@@ -356,6 +355,10 @@ if __name__ == "__main__":
 
     parser.add_argument('--e_cutoff', default=-8.75, type=int)
     parser.add_argument('--debias', default=False, type=bool)
+    parser.add_argument('--tau', default=0.5, type=float)
+    parser.add_argument('--dynamic', default=False, type=bool)
+    parser.add_argument('--margin', default=0.5, type=float)
+    parser.add_argument('--per_cls', default=False, type=bool)
 
     # config file
     parser.add_argument('--c', type=str, default='')

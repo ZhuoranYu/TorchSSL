@@ -10,7 +10,6 @@ num_eval_iter: 5000
 num_labels: 40
 batch_size: 64
 eval_batch_size: 1024
-hard_label: True
 T: 0.5
 p_cutoff: 0.95
 ulb_loss_ratio: 1.0
@@ -42,8 +41,4 @@ dist_backend: nccl
 gpu: 0
 e_cutoff: -8.0
 joint_conf: False
-x1: 0.5
-y1: -9
-x2: 1.0
-y2: -12
-degree: 20
+hard_label: True

@@ -105,7 +105,7 @@ class BasicDataset(Dataset):
                     img_s2 = self.strong_transform(img)
                     return idx, img_w, img_s1, img_s2, img_s1_rot, rotate_v_list.index(rotate_v1)
                 elif self.alg == "energymatch":
-                    return idx, img_w, self.strong_transform(img)
+                    return idx, img_w, self.strong_transform(img), target
                 elif self.alg == 'fullysupervised':
                     return idx
 
