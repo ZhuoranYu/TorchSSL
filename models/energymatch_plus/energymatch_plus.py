@@ -287,6 +287,9 @@ class EnergyMatchPlus:
             tb_dict['lr'] = self.optimizer.param_groups[0]['lr']
             tb_dict['train/prefecth_time'] = start_batch.elapsed_time(end_batch) / 1000.
             tb_dict['train/run_time'] = start_run.elapsed_time(end_run) / 1000.
+            tb_dict['train/threshold'] = threshold
+
+            wandb.log(tb_dict)
 
             # Save model for each 10K steps and best model for each 1K steps
             if self.it % 10000 == 0:
