@@ -43,6 +43,4 @@ e_cutoff: -8.0
 debias: False
 tau: 0.5
 dynamic: True
-margin: 0
-per_cls: False
 hard_label: False

@@ -247,7 +247,7 @@ class EnergyMatch:
             tb_dict['train/sup_loss'] = sup_loss.detach()
             tb_dict['train/unsup_loss'] = unsup_loss.detach()
             tb_dict['train/total_loss'] = total_loss.detach()
-            tb_dict['train/num_pseudo'] = sum
+            tb_dict['train/num_pseudo'] = mask
             tb_dict['lr'] = self.optimizer.param_groups[0]['lr']
             tb_dict['train/prefecth_time'] = start_batch.elapsed_time(end_batch) / 1000.
             tb_dict['train/run_time'] = start_run.elapsed_time(end_run) / 1000.
@@ -286,7 +286,7 @@ class EnergyMatch:
                     if self.it == best_it:
                         self.save_model('model_best.pth', save_path)
 
-                    wandb.log(tb_dict, self.it)
+                    wandb.log(tb_dict)
 
             self.it += 1
             del tb_dict

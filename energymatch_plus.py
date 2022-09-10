@@ -357,8 +357,6 @@ if __name__ == "__main__":
     parser.add_argument('--debias', default=False, type=bool)
     parser.add_argument('--tau', default=0.5, type=float)
     parser.add_argument('--dynamic', default=False, type=bool)
-    parser.add_argument('--margin', default=0.5, type=float)
-    parser.add_argument('--per_cls', default=False, type=bool)
 
     # config file
     parser.add_argument('--c', type=str, default='')

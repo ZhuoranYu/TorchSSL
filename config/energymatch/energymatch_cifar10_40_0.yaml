@@ -13,7 +13,7 @@ eval_batch_size: 1024
 T: 0.5
 p_cutoff: 0.95
 ulb_loss_ratio: 1.0
-uratio: 7
+uratio: 1
 ema_m: 0.999
 optim: SGD
 lr: 0.03

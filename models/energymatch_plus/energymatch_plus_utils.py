@@ -43,7 +43,7 @@ def consistency_loss(logits_s, logits_w, qhat, e_cutoff=-8.75, debias=False, tau
         else:
             mask_raw = energy < e_cutoff[max_idx] # class-specific energy threshold
     else:
-        mask_raw = energy < 0
+        mask_raw = energy > 0 # warmup: make it all false
 
     mask = mask_raw.float()
     select = max_probs[mask_raw]

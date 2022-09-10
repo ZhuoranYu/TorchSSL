@@ -227,20 +227,17 @@ class EnergyMatchPlus:
                 self.update_qhat(torch.softmax(logits_x_ulb_w.detach(), dim=-1))
 
                 if args.dynamic:
-                    energy_lb = -torch.logsumexp(logits_x_lb, dim=1)
-                    if not args.per_cls: # if use a uniform dynamic threshold
-                        threshold = energy_lb.mean().data.item()
-                    else: # if we use a class-specific dynamic threshold
-                        threshold = torch.zeros(args.num_classes, device=energy_lb.device)
-                        for c in range(args.num_classes):
-                            c_mask = (y_lb == c)
-                            energy_lb_c = energy_lb[c_mask]
-                            threshold[c] = energy_lb_c.mean().data.item()
-
+                    energy_ulb = -torch.logsumexp(logits_x_lb, dim=1)
+                    threshold = torch.zeros(args.num_classes, device=energy_ulb.device)
+                    for c in range(args.num_classes):
+                        c_mask = (y_lb == c)
+                        energy_lb_c = energy_ulb[c_mask]
+                        avg_energy_c = torch.mean(energy_lb_c).data.item() # averaged energy per cls
+                        threshold[c] = max(args.e_cutoff, avg_energy_c)
                 else:
                     threshold = args.e_cutoff
 
-                if self.it < 10:
+                if self.it < 1000:
                     threshold = None
 
                 unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
@@ -287,9 +284,13 @@ class EnergyMatchPlus:
             tb_dict['lr'] = self.optimizer.param_groups[0]['lr']
             tb_dict['train/prefecth_time'] = start_batch.elapsed_time(end_batch) / 1000.
             tb_dict['train/run_time'] = start_run.elapsed_time(end_run) / 1000.
-            tb_dict['train/threshold'] = threshold
 
-            wandb.log(tb_dict)
+
+            if torch.is_tensor(threshold):
+                for c in range(self.num_classes):
+                    tb_dict[f'train/threshold_{c}'] = threshold[c]
+            else:
+                tb_dict['train/threshold'] = threshold
 
             # Save model for each 10K steps and best model for each 1K steps
             if self.it % 10000 == 0:
@@ -325,7 +326,7 @@ class EnergyMatchPlus:
                     if self.it == best_it:
                         self.save_model('model_best.pth', save_path)
 
-                    wandb.log(tb_dict, self.it)
+                    wandb.log(tb_dict)
 
             self.it += 1
             del tb_dict
