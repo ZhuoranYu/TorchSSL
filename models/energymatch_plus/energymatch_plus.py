@@ -240,10 +240,13 @@ class EnergyMatchPlus:
                 if self.it < 1000:
                     threshold = None
 
+                weight = 1 - float(self.it) / args.num_train_iter
                 unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
                                                                                         logits_x_ulb_w,
                                                                                         self.qhat,
+                                                                                        p_cutoff=args.p_cutoff,
                                                                                         e_cutoff=threshold,
+                                                                                        weight=weight,
                                                                                         debias=args.debias,
                                                                                         tau=args.tau,
                                                                                         use_hard_labels=args.hard_label)

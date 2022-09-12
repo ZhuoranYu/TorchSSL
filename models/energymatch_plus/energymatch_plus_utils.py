@@ -25,7 +25,7 @@ def debiasing(current_logit, qhat, tau=0.5):
     debiased_logits = current_logit - tau * torch.log(qhat)
     return debiased_logits
 
-def consistency_loss(logits_s, logits_w, qhat, e_cutoff=-8.75, debias=False, tau=0.5, use_hard_labels=True):
+def consistency_loss(logits_s, logits_w, qhat, p_cutoff=0.95, e_cutoff=-8.75, weight=1.0, debias=False, tau=0.5, use_hard_labels=True):
     logits_w = logits_w.detach()
 
     # add debiasing before computing energy
@@ -39,13 +39,20 @@ def consistency_loss(logits_s, logits_w, qhat, e_cutoff=-8.75, debias=False, tau
 
     if e_cutoff is not None:
         if isinstance(e_cutoff, float):
-            mask_raw = energy < e_cutoff
+            mask_raw_e = energy < e_cutoff
         else:
-            mask_raw = energy < e_cutoff[max_idx] # class-specific energy threshold
+            mask_raw_e = energy < e_cutoff[max_idx] # class-specific energy threshold
     else:
-        mask_raw = energy > 0 # warmup: make it all false
+        mask_raw_e = energy > 0 # warmup: make it all false
 
+    mask_raw_p = max_probs > p_cutoff
+
+    mask_raw = torch.logical_or(mask_raw_p, mask_raw_e)
+
+    mask_e = mask_raw_e.float()
+    mask_p = mask_raw_p.float()
     mask = mask_raw.float()
+
     select = max_probs[mask_raw]
 
     # adaptive marginal loss
@@ -54,11 +61,15 @@ def consistency_loss(logits_s, logits_w, qhat, e_cutoff=-8.75, debias=False, tau
         logits_s = logits_s + tau * delta_logits
 
     if use_hard_labels:
-        masked_loss = ce_loss(logits_s, max_idx, use_hard_labels, reduction='none') * mask
+        masked_loss_e = ce_loss(logits_s, max_idx, use_hard_labels, reduction='none') * mask_e
+        masked_loss_p = ce_loss(logits_s, max_idx, use_hard_labels, reduction='none') * mask_p
     else:
         T = 0.5
         pseudo_label = torch.softmax(logits_w / T , dim=-1)
-        masked_loss = ce_loss(logits_s, pseudo_label, use_hard_labels) * mask
+        masked_loss_e = ce_loss(logits_s, pseudo_label, use_hard_labels) * mask_e
+        masked_loss_p = ce_loss(logits_s, pseudo_label, use_hard_labels) * mask_p
+
+    masked_loss = masked_loss_e * weight + (1 - weight) * masked_loss_p
 
     if e_cutoff is None:
         masked_loss = masked_loss * 0
