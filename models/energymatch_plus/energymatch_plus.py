@@ -14,19 +14,17 @@ from train_utils import AverageMeter
 
 from .energymatch_plus_utils import consistency_loss, Get_Scalar
 from train_utils import ce_loss, wd_loss, EMA, Bn_Controller
-from analyze_utils import *
 
 from sklearn.metrics import *
 from copy import deepcopy
 
 import wandb
 
-
 class EnergyMatchPlus:
     def __init__(self, net_builder, num_classes, ema_m, T, p_cutoff, lambda_u, \
                  hard_label=True, t_fn=None, p_fn=None, it=0, num_eval_iter=1000, tb_log=None, logger=None):
         """
-        class Fixmatch contains setter of data_loader, optimizer, and model update methods.
+        class Flexmatch contains setter of data_loader, optimizer, and model update methods.
         Args:
             net_builder: backbone network class (see net_builder in utils.py)
             num_classes: # of label classes
@@ -59,19 +57,15 @@ class EnergyMatchPlus:
         self.t_fn = Get_Scalar(T)  # temperature params function
         self.p_fn = Get_Scalar(p_cutoff)  # confidence cutoff function
         self.lambda_u = lambda_u
+        self.tb_log = tb_log
         self.use_hard_label = hard_label
 
         self.optimizer = None
         self.scheduler = None
 
         self.it = 0
-        self.lst = [[] for i in range(10)]
-        self.abs_lst = [[] for i in range(10)]
-        self.clsacc = [[] for i in range(10)]
         self.logger = logger
         self.print_fn = print if logger is None else logger.info
-
-        self.qhat_m = 0.999
 
         self.bn_controller = Bn_Controller()
 
@@ -86,73 +80,6 @@ class EnergyMatchPlus:
         self.optimizer = optimizer
         self.scheduler = scheduler
 
-    def save_energy_pseudo(self, dataset, scores_ulb, label_ulb, energy_ulb):
-        scores_ulb = torch.cat(scores_ulb, dim=0)
-        label_ulb = torch.cat(label_ulb, dim=0)
-        max_score, max_index = torch.max(scores_ulb, dim=-1)
-        incorrect_mask = (max_index != label_ulb)
-
-        pred_column = torch.zeros_like(label_ulb)  # to store correctness
-        pred_column[incorrect_mask] = 1  # incorrectly predicted as head
-        pred_column = pred_column
-
-        energy_ulb = torch.cat(energy_ulb, dim=0)
-
-        # from pseudo label's perspective
-        data = np.vstack([max_score.detach().cpu().numpy(), energy_ulb.detach().cpu().numpy(),
-                          pred_column.detach().cpu().numpy().astype(np.float)]).transpose()
-        df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-        os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
-        df.to_csv(f'{dataset}_track/{self.it // 1000}k/overall_pseudo.csv', index=False)
-        for c in range(self.num_classes):
-            c_mask = max_index == c
-            c_score = max_score[c_mask].detach().cpu().numpy()
-            c_energy = energy_ulb[c_mask].detach().cpu().numpy()
-            c_pred_column = pred_column[c_mask].detach().cpu().numpy().astype(np.float)
-
-            data = np.vstack([c_score, c_energy, c_pred_column]).transpose()
-            df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-            os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
-            df.to_csv(f'{dataset}_track/{self.it // 1000}k/class_{c}_pseudo.csv', index=False)
-
-    def save_energy_real(self, dataset, scores_ulb, label_ulb, energy_ulb):
-        scores_ulb = torch.cat(scores_ulb, dim=0)
-        label_ulb = torch.cat(label_ulb, dim=0)
-        max_score, max_index = torch.max(scores_ulb, dim=-1)
-        incorrect_mask = (max_index != label_ulb)
-
-        pred_column = torch.zeros_like(label_ulb)  # to store correctness
-        pred_column[incorrect_mask] = 1  # incorrectly predicted as head
-        pred_column = pred_column
-
-        energy_ulb = torch.cat(energy_ulb, dim=0)
-
-        # from real label's perspective
-        data = np.vstack([max_score.detach().cpu().numpy(), energy_ulb.detach().cpu().numpy(),
-                          pred_column.detach().cpu().numpy().astype(np.float)]).transpose()
-        df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-        os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
-        df.to_csv(f'{dataset}_track/{self.it // 1000}k/overall_real.csv', index=False)
-        for c in range(self.num_classes):
-            c_mask = label_ulb == c
-            c_score = max_score[c_mask].detach().cpu().numpy()
-            c_energy = energy_ulb[c_mask].detach().cpu().numpy()
-            c_pred_column = pred_column[c_mask].detach().cpu().numpy().astype(np.float)
-
-            data = np.vstack([c_score, c_energy, c_pred_column]).transpose()
-            df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-            os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
-            df.to_csv(f'{dataset}_track/{self.it // 1000}k/class_{c}_real.csv', index=False)
-
-    def initial_qhat(self, class_num=1000):
-        # initialize qhat of predictions (probability)
-        self.qhat = (torch.ones([1, class_num], dtype=torch.float) / class_num).cuda()
-        print("qhat size: {}".format(self.qhat.size()))
-
-    def update_qhat(self, probs):
-        mean_prob = probs.detach().mean(dim=0)
-        self.qhat = self.qhat_m * self.qhat + (1 - self.qhat_m) * mean_prob
-
     def train(self, args, logger=None):
 
         ngpus_per_node = torch.cuda.device_count()
@@ -163,6 +90,19 @@ class EnergyMatchPlus:
         self.ema.register()
         if args.resume == True:
             self.ema.load(self.ema_model)
+
+        # p(y) based on the labeled examples seen during training
+        dist_file_name = r"./data_statistics/" + args.dataset + '_' + str(args.num_labels) + '.json'
+        if args.dataset.upper() == 'IMAGENET':
+            p_target = None
+        else:
+            with open(dist_file_name, 'r') as f:
+                p_target = json.loads(f.read())
+                p_target = torch.tensor(p_target['distribution'])
+                p_target = p_target.cuda(args.gpu)
+            # print('p_target:', p_target)
+
+        p_model = None
 
         # for gpu profiling
         start_batch = torch.cuda.Event(enable_timing=True)
@@ -186,15 +126,8 @@ class EnergyMatchPlus:
 
         classwise_acc = torch.zeros((args.num_classes,)).cuda(args.gpu)
 
-        self.initial_qhat(class_num=self.num_classes)
-
-        pseudo_labels_acc = []
-        true_labels_acc = []
-        all_true_labels_acc = []
-
         for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s, y_ulb) in zip(self.loader_dict['train_lb'],
                                                                   self.loader_dict['train_ulb']):
-
             # prevent the training iterations exceed args.num_train_iter
             if self.it > args.num_train_iter:
                 break
@@ -206,14 +139,22 @@ class EnergyMatchPlus:
             num_lb = x_lb.shape[0]
             num_ulb = x_ulb_w.shape[0]
             assert num_ulb == x_ulb_s.shape[0]
+
             x_lb, x_ulb_w, x_ulb_s = x_lb.cuda(args.gpu), x_ulb_w.cuda(args.gpu), x_ulb_s.cuda(args.gpu)
+            x_ulb_idx = x_ulb_idx.cuda(args.gpu)
             y_lb = y_lb.cuda(args.gpu)
-            y_ulb = y_ulb.cuda(args.gpu)
 
             pseudo_counter = Counter(selected_label.tolist())
             if max(pseudo_counter.values()) < len(self.ulb_dset):  # not all(5w) -1
-                for i in range(args.num_classes):
-                    classwise_acc[i] = pseudo_counter[i] / max(pseudo_counter.values())
+                if args.thresh_warmup:
+                    for i in range(args.num_classes):
+                        classwise_acc[i] = pseudo_counter[i] / max(pseudo_counter.values())
+                else:
+                    wo_negative_one = deepcopy(pseudo_counter)
+                    if -1 in wo_negative_one.keys():
+                        wo_negative_one.pop(-1)
+                    for i in range(args.num_classes):
+                        classwise_acc[i] = pseudo_counter[i] / max(wo_negative_one.values())
 
             inputs = torch.cat((x_lb, x_ulb_w, x_ulb_s))
 
@@ -224,39 +165,28 @@ class EnergyMatchPlus:
                 logits_x_ulb_w, logits_x_ulb_s = logits[num_lb:].chunk(2)
                 sup_loss = ce_loss(logits_x_lb, y_lb, reduction='mean')
 
-                self.update_qhat(torch.softmax(logits_x_ulb_w.detach(), dim=-1))
-
-                if args.dynamic:
-                    energy_ulb = -torch.logsumexp(logits_x_lb, dim=1)
-                    threshold = torch.zeros(args.num_classes, device=energy_ulb.device)
-                    for c in range(args.num_classes):
-                        c_mask = (y_lb == c)
-                        energy_lb_c = energy_ulb[c_mask]
-                        avg_energy_c = torch.mean(energy_lb_c).data.item() # averaged energy per cls
-                        threshold[c] = max(args.e_cutoff, avg_energy_c)
-                else:
-                    threshold = args.e_cutoff
-
-                if self.it < 1000:
-                    threshold = None
+                # hyper-params for update
+                T = self.t_fn(self.it)
+                p_cutoff = self.p_fn(self.it)
 
                 weight = 1 - float(self.it) / args.num_train_iter
-                unsup_loss, mask, select_scores, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
-                                                                                        logits_x_ulb_w,
-                                                                                        self.qhat,
-                                                                                        p_cutoff=args.p_cutoff,
-                                                                                        e_cutoff=threshold,
-                                                                                        weight=weight,
-                                                                                        debias=args.debias,
-                                                                                        tau=args.tau,
-                                                                                        use_hard_labels=args.hard_label)
+
+                unsup_loss, mask, select, pseudo_lb, p_model = consistency_loss(logits_x_ulb_s,
+                                                                                logits_x_ulb_w,
+                                                                                classwise_acc,
+                                                                                p_target,
+                                                                                p_model,
+                                                                                'ce', T, p_cutoff,
+                                                                                use_hard_labels=args.hard_label,
+                                                                                use_DA=False,
+                                                                                weight=weight,
+                                                                                e_cutoff=args.e_cutoff
+                                                                                )
+
+                if x_ulb_idx[select == 1].nelement() != 0:
+                    selected_label[x_ulb_idx[select == 1]] = pseudo_lb[select == 1]
 
                 total_loss = sup_loss + self.lambda_u * unsup_loss
-
-                pseudo_labels_acc.append(pseudo_lb[mask_raw])
-                true_labels_acc.append(y_ulb[mask_raw])
-                all_true_labels_acc.append(y_ulb)
-
 
             # parameter updates
             if args.amp:
@@ -283,17 +213,10 @@ class EnergyMatchPlus:
             tb_dict['train/sup_loss'] = sup_loss.detach()
             tb_dict['train/unsup_loss'] = unsup_loss.detach()
             tb_dict['train/total_loss'] = total_loss.detach()
-            tb_dict['train/num_pseudo'] = mask
+            tb_dict['train/mask_ratio'] = 1.0 - mask.detach()
             tb_dict['lr'] = self.optimizer.param_groups[0]['lr']
             tb_dict['train/prefecth_time'] = start_batch.elapsed_time(end_batch) / 1000.
             tb_dict['train/run_time'] = start_run.elapsed_time(end_run) / 1000.
-
-
-            if torch.is_tensor(threshold):
-                for c in range(self.num_classes):
-                    tb_dict[f'train/threshold_{c}'] = threshold[c]
-            else:
-                tb_dict['train/threshold'] = threshold
 
             # Save model for each 10K steps and best model for each 1K steps
             if self.it % 10000 == 0:
@@ -303,23 +226,12 @@ class EnergyMatchPlus:
                     self.save_model('latest_model.pth', save_path)
 
             if self.it % self.num_eval_iter == 0:
-
                 eval_dict = self.evaluate(args=args)
                 tb_dict.update(eval_dict)
-
-                pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes)
-
-                tb_dict.update(pr_dict)
-                pseudo_labels_acc = []
-                true_labels_acc = []
-                all_true_labels_acc = []
-
                 save_path = os.path.join(args.save_dir, args.save_name)
-
                 if tb_dict['eval/top-1-acc'] > best_eval_acc:
                     best_eval_acc = tb_dict['eval/top-1-acc']
                     best_it = self.it
-
                 self.print_fn(
                     f"{self.it} iteration, USE_EMA: {self.ema_m != 0}, {tb_dict}, BEST_EVAL_ACC: {best_eval_acc}, at {best_it} iters")
 
@@ -328,8 +240,7 @@ class EnergyMatchPlus:
 
                     if self.it == best_it:
                         self.save_model('model_best.pth', save_path)
-
-                    wandb.log(tb_dict)
+                    wandb.log(tb_dict, self.it)
 
             self.it += 1
             del tb_dict
@@ -368,7 +279,6 @@ class EnergyMatchPlus:
         recall = recall_score(y_true, y_pred, average='macro')
         F1 = f1_score(y_true, y_pred, average='macro')
         AUC = roc_auc_score(y_true, y_logits, multi_class='ovo')
-
         cf_mat = confusion_matrix(y_true, y_pred, normalize='true')
         self.print_fn('confusion matrix:\n' + np.array_str(cf_mat))
         self.ema.restore()

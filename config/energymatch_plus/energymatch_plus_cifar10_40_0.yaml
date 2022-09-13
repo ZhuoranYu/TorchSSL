@@ -42,5 +42,5 @@ gpu: 0
 e_cutoff: -8.0
 debias: False
 tau: 0.5
-dynamic: True
+dynamic: False
 hard_label: False

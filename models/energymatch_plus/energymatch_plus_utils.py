@@ -1,6 +1,8 @@
-import numpy as np
 import torch
+import math
 import torch.nn.functional as F
+import numpy as np
+
 from train_utils import ce_loss
 
 
@@ -15,64 +17,45 @@ class Get_Scalar:
         return self.value
 
 
-def interpolation(x1, y1, x2, y2, k):
-    beta = np.log(y1 / y2) / (x1 ** k - x2 ** k)
-    alpha = y1 / np.exp(beta * (x1 ** k))
-
-    return alpha, beta
-
-def debiasing(current_logit, qhat, tau=0.5):
-    debiased_logits = current_logit - tau * torch.log(qhat)
-    return debiased_logits
-
-def consistency_loss(logits_s, logits_w, qhat, p_cutoff=0.95, e_cutoff=-8.75, weight=1.0, debias=False, tau=0.5, use_hard_labels=True):
+def consistency_loss(logits_s, logits_w, class_acc, p_target, p_model, name='ce',
+                     T=1.0, p_cutoff=0.0, use_hard_labels=True, use_DA=False, weight=1.0, e_cutoff=-8):
+    assert name in ['ce', 'L2']
     logits_w = logits_w.detach()
+    if name == 'L2':
+        assert logits_w.size() == logits_s.size()
+        return F.mse_loss(logits_s, logits_w, reduction='mean')
 
-    # add debiasing before computing energy
-    if debias:
-        logits_w = debiasing(logits_w, qhat, tau)
+    elif name == 'L2_mask':
+        pass
 
-    energy = -torch.logsumexp(logits_w, dim=1)
-    pseudo_label = torch.softmax(logits_w, dim=-1)
+    elif name == 'ce':
+        pseudo_label = torch.softmax(logits_w, dim=-1)
+        if use_DA:
+            if p_model == None:
+                p_model = torch.mean(pseudo_label.detach(), dim=0)
+            else:
+                p_model = p_model * 0.999 + torch.mean(pseudo_label.detach(), dim=0) * 0.001
+            pseudo_label = pseudo_label * p_target / p_model
+            pseudo_label = (pseudo_label / pseudo_label.sum(dim=-1, keepdim=True))
 
-    max_probs, max_idx = torch.max(pseudo_label, dim=-1)
+        max_probs, max_idx = torch.max(pseudo_label, dim=-1)
+        mask = max_probs.ge(p_cutoff * (class_acc[max_idx] / (2. - class_acc[max_idx]))).float()  # convex
+        select = max_probs.ge(p_cutoff).long()
 
-    if e_cutoff is not None:
-        if isinstance(e_cutoff, float):
-            mask_raw_e = energy < e_cutoff
+        energy = -torch.logsumexp(logits_w, dim=1)
+        mask_e = (energy < e_cutoff).float()
+
+        if use_hard_labels:
+            masked_loss = ce_loss(logits_s, max_idx, use_hard_labels, reduction='none') * mask
+            energy_loss = ce_loss(logits_s, max_idx, use_hard_labels, reduction='none') * mask_e
         else:
-            mask_raw_e = energy < e_cutoff[max_idx] # class-specific energy threshold
+            pseudo_label = torch.softmax(logits_w / T, dim=-1)
+            masked_loss = ce_loss(logits_s, pseudo_label, use_hard_labels) * mask
+            energy_loss = ce_loss(logits_s, pseudo_label, use_hard_labels) * mask_e
+
+        loss = weight * masked_loss + (1 - weight) * energy_loss
+
+        return loss.mean(), mask.mean(), select, max_idx.long(), p_model
+
     else:
-        mask_raw_e = energy > 0 # warmup: make it all false
-
-    mask_raw_p = max_probs > p_cutoff
-
-    mask_raw = torch.logical_or(mask_raw_p, mask_raw_e)
-
-    mask_e = mask_raw_e.float()
-    mask_p = mask_raw_p.float()
-    mask = mask_raw.float()
-
-    select = max_probs[mask_raw]
-
-    # adaptive marginal loss
-    if debias:
-        delta_logits = torch.log(qhat)
-        logits_s = logits_s + tau * delta_logits
-
-    if use_hard_labels:
-        masked_loss_e = ce_loss(logits_s, max_idx, use_hard_labels, reduction='none') * mask_e
-        masked_loss_p = ce_loss(logits_s, max_idx, use_hard_labels, reduction='none') * mask_p
-    else:
-        T = 0.5
-        pseudo_label = torch.softmax(logits_w / T , dim=-1)
-        masked_loss_e = ce_loss(logits_s, pseudo_label, use_hard_labels) * mask_e
-        masked_loss_p = ce_loss(logits_s, pseudo_label, use_hard_labels) * mask_p
-
-    masked_loss = masked_loss_e * weight + (1 - weight) * masked_loss_p
-
-    if e_cutoff is None:
-        masked_loss = masked_loss * 0
-        mask = mask * 0
-    return masked_loss.mean(), mask.sum(), select, max_idx.long(), mask_raw
-
+        assert Exception('Not Implemented consistency_loss')
