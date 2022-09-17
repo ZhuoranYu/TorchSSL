@@ -217,10 +217,15 @@ class Debiased:
                 T = self.t_fn(self.it)
                 p_cutoff = self.p_fn(self.it)
 
+                if args.use_energy:
+                    e_cutoff = args.e_cutoff
+                else:
+                    e_cutoff = None
+
                 unsup_loss, mask, select, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
                                                                        logits_x_ulb_w,
                                                                        self.qhat,
-                                                                       'ce', T, p_cutoff,
+                                                                       'ce', T, p_cutoff, e_cutoff,
                                                                        use_hard_labels=args.hard_label,
                                                                        tau=args.tau)
                 self.update_qhat(torch.softmax(logits_x_ulb_w.detach(), dim=-1), momentum=args.qhat_m)

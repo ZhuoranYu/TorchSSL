@@ -19,7 +19,7 @@ def causal_inference(current_logit, qhat, tau=0.5):
     return debiased_prob
 
 
-def consistency_loss(logits_s, logits_w, qhat, name='ce', T=1.0, p_cutoff=0.0, use_hard_labels=True, tau=0.5):
+def consistency_loss(logits_s, logits_w, qhat, name='ce', T=1.0, p_cutoff=0.0, e_cutoff=-8, use_hard_labels=True, tau=0.5):
     assert name in ['ce', 'L2']
     logits_w = logits_w.detach()
     if name == 'L2':
@@ -32,7 +32,13 @@ def consistency_loss(logits_s, logits_w, qhat, name='ce', T=1.0, p_cutoff=0.0, u
     elif name == 'ce':
         pseudo_label = causal_inference(logits_w, qhat, tau)
         max_probs, max_idx = torch.max(pseudo_label, dim=-1)
-        mask_raw = max_probs.ge(p_cutoff)
+
+        energy = -torch.logsumexp(logits_w, dim=1)
+
+        if e_cutoff is not None:
+            mask_raw = energy.le(e_cutoff)
+        else:
+            mask_raw = max_probs.ge(p_cutoff)
         mask = mask_raw.float()
         select = max_probs.ge(p_cutoff).long()
 

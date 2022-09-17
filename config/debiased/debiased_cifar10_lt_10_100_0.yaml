@@ -46,4 +46,6 @@ imb_ratio_lb: 100
 imb_ratio_ulb: 100
 labeled_percentage: 10
 tau: 0.5
+use_energy: True
+e_cutoff: -9
 

@@ -359,6 +359,8 @@ if __name__ == "__main__":
 
     parser.add_argument('--tau', type=float, default=0.5)
     parser.add_argument('--qhat_m', type=float, default=0.999)
+    parser.add_argument('--use_energy', type=bool, default=False)
+    parser.add_argument('--e_cutoff', type=float, default=-8)
 
     args = parser.parse_args()
     over_write_args_from_file(args, args.c)
