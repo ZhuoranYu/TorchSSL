@@ -227,6 +227,8 @@ class Debiased:
                                                                        self.qhat,
                                                                        'ce', T, p_cutoff, e_cutoff,
                                                                        use_hard_labels=args.hard_label,
+                                                                       use_debias=args.use_debias,
+                                                                       use_marginal_loss=args.use_marginal_loss,
                                                                        tau=args.tau)
                 self.update_qhat(torch.softmax(logits_x_ulb_w.detach(), dim=-1), momentum=args.qhat_m)
 

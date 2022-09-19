@@ -1,5 +1,5 @@
 save_dir: ./soar
-save_name: debiased_cifar10_lt_10_100_0
+save_name: debiased_cifar10_lt_10_100_0_energy_11
 resume: False
 load_path: None
 overwrite: True
@@ -47,5 +47,5 @@ imb_ratio_ulb: 100
 labeled_percentage: 10
 tau: 0.5
 use_energy: True
-e_cutoff: -9
+e_cutoff: -11.0
 

@@ -1,5 +1,5 @@
 save_dir: ./soar
-save_name: debiased_cifar10_40_0
+save_name: debiased_cifar10_40_0_energy_8_marginal_loss_only
 resume: False
 load_path: None
 overwrite: True
@@ -42,4 +42,6 @@ dist_backend: nccl
 gpu: 0
 tau: 0.5
 use_energy: True
-e_cutoff: -9
+e_cutoff: -8
+use_debias: False
+use_marginal_loss: True

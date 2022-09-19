@@ -362,6 +362,11 @@ if __name__ == "__main__":
     parser.add_argument('--use_energy', type=bool, default=False)
     parser.add_argument('--e_cutoff', type=float, default=-8)
 
+    parser.add_argument('--use_debias', type=bool, default=True)
+    parser.add_argument('--use_marginal_loss', type=bool, default=True)
+
+
+
     args = parser.parse_args()
     over_write_args_from_file(args, args.c)
     main(args)

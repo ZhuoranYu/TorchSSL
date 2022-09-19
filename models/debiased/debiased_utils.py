@@ -19,7 +19,7 @@ def causal_inference(current_logit, qhat, tau=0.5):
     return debiased_prob
 
 
-def consistency_loss(logits_s, logits_w, qhat, name='ce', T=1.0, p_cutoff=0.0, e_cutoff=-8, use_hard_labels=True, tau=0.5):
+def consistency_loss(logits_s, logits_w, qhat, name='ce', T=1.0, p_cutoff=0.0, e_cutoff=-8, use_hard_labels=True, use_debias=True, use_marginal_loss=True, tau=0.5):
     assert name in ['ce', 'L2']
     logits_w = logits_w.detach()
     if name == 'L2':
@@ -30,7 +30,12 @@ def consistency_loss(logits_s, logits_w, qhat, name='ce', T=1.0, p_cutoff=0.0, e
         pass
 
     elif name == 'ce':
-        pseudo_label = causal_inference(logits_w, qhat, tau)
+        # whether we want to use debias
+        if use_debias:
+            pseudo_label = causal_inference(logits_w, qhat, tau)
+        else:
+            pseudo_label = F.softmax(logits_w, dim=1)
+
         max_probs, max_idx = torch.max(pseudo_label, dim=-1)
 
         energy = -torch.logsumexp(logits_w, dim=1)
@@ -42,8 +47,10 @@ def consistency_loss(logits_s, logits_w, qhat, name='ce', T=1.0, p_cutoff=0.0, e
         mask = mask_raw.float()
         select = max_probs.ge(p_cutoff).long()
 
-        delta_logits = torch.log(qhat)
-        logits_s = logits_s + tau * delta_logits
+
+        if use_marginal_loss:
+            delta_logits = torch.log(qhat)
+            logits_s = logits_s + tau * delta_logits
 
         if use_hard_labels:
             masked_loss = ce_loss(logits_s, max_idx, use_hard_labels, reduction='none') * mask
