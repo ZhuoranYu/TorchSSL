@@ -327,8 +327,10 @@ class Debiased:
             y_pred.extend(torch.max(logits, dim=-1)[1].cpu().tolist())
             y_logits.extend(torch.softmax(logits, dim=-1).cpu().tolist())
             total_loss += loss.detach() * num_batch
+        
+        minority_cutoff = self.num_classes * 0.3
 
-        minority_mask = torch.logical_or(torch.logical_or(torch.tensor(y_true) == 9, torch.tensor(y_true) == 8), torch.tensor(y_true) == 7)
+        minority_mask = torch.tensor(y_true) >= (self.num_classes - minority_cutoff)
         y_mino = torch.tensor(y_true)[minority_mask].tolist()
         pred_mino = torch.tensor(y_pred)[minority_mask].tolist()
         minority_acc = accuracy_score(y_mino, pred_mino)

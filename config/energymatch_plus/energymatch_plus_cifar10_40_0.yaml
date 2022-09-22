@@ -1,5 +1,5 @@
 save_dir: ./nb_plus
-save_name: energy_cifar10_40_2_fix_joint_e8
+save_name: energy_cifar10_40_0_flex_joint_e9
 resume: False
 load_path: None
 overwrite: True
@@ -32,14 +32,14 @@ train_sampler: RandomSampler
 num_classes: 10
 num_workers: 1
 alg: energymatch
-seed: 2
+seed: 0
 world_size: 1
 rank: 0
 multiprocessing_distributed: False
 dist_url: tcp://127.0.0.1:10006
 dist_backend: nccl
 gpu: 0
-e_cutoff: -8
+e_cutoff: -9
 debias: False
 tau: 0.5
 dynamic: False
