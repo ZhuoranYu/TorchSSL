@@ -1,0 +1,16 @@
+[2022-09-26 11:50:48,171 WARNING] USE GPU: 0 for training
+[2022-09-26 11:50:49,689 INFO] Number of Trainable Params: 1481252
+[2022-09-26 11:50:49,707 INFO] model_arch: <models.debiased.debiased.Debiased object at 0x7f2df13b9ed0>
+[2022-09-26 11:50:49,707 INFO] Arguments: Namespace(T=0.5, alg='fixmatch', amp=False, batch_size=64, bn_momentum=0.0010000000000000009, c='shilong/debiased_cifar100_lt_30_50_0.yaml', clip=0, cycle=0, data_dir='./data', dataset='cifar100', depth=28, dist_backend='nccl', dist_url='tcp://127.0.0.1:10007', distributed=False, dropout=0.0, e_cutoff=-11.0, ema_m=0.999, epoch=1, eval_batch_size=1024, gpu=0, hard_label=True, imb_ratio_lb=50, imb_ratio_ulb=50, labeled_percentage=30, leaky_slope=0.1, load_path='None', long_tail=True, lr=0.03, momentum=0.9, multiprocessing_distributed=False, net='WideResNet', net_from_name=False, num_classes=100, num_eval_iter=1000, num_labels=400, num_train_iter=393216, num_workers=4, optim='SGD', overwrite=True, p_cutoff=0.95, qhat_m=0.999, rank=0, resume=False, save_dir='./cifar100', save_name='debiased_cifar100_lt_30_50_0', seed=0, tau=0.5, train_sampler='RandomSampler', ulb_loss_ratio=1.0, uratio=1, use_debias=True, use_energy=False, use_marginal_loss=True, use_tensorboard=True, weight_decay=0.001, widen_factor=2, world_size=1)
+[2022-09-26 11:50:53,512 INFO] [!] data loader keys: dict_keys(['train_lb', 'train_ulb', 'eval'])
+[2022-09-26 11:50:54,664 INFO] model saved: ./cifar100/debiased_cifar100_lt_30_50_0/latest_model.pth
+[2022-09-26 11:50:56,270 INFO] confusion matrix:
+[[0. 0. 0. ... 0. 0. 0.]
+ [0. 0. 0. ... 0. 0. 0.]
+ [0. 0. 0. ... 0. 0. 0.]
+ ...
+ [0. 0. 0. ... 0. 0. 0.]
+ [0. 0. 0. ... 0. 0. 0.]
+ [0. 0. 0. ... 0. 0. 0.]]
+[2022-09-26 11:50:56,281 INFO] 0 iteration, USE_EMA: True, {'train/sup_loss': tensor(4.7954, device='cuda:0'), 'train/unsup_loss': tensor(0., device='cuda:0'), 'train/total_loss': tensor(4.7954, device='cuda:0'), 'train/mask_ratio': tensor(1., device='cuda:0'), 'lr': 0.03, 'train/prefecth_time': 0.48647781372070314, 'train/run_time': 0.5839300537109375, 'eval/loss': tensor(48.6038, device='cuda:0'), 'eval/top-1-acc': 0.0103, 'eval/top-5-acc': 0.0505, 'eval/minority-acc': 0.03266666666666666}, BEST_EVAL_ACC: 0.0103, MINORITY_ACC: 0.03266666666666666, at 0 iters
+[2022-09-26 11:50:56,316 INFO] model saved: ./cifar100/debiased_cifar100_lt_30_50_0/model_best.pth
