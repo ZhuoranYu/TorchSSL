@@ -12,7 +12,7 @@ batch_size: 64
 eval_batch_size: 1024
 hard_label: True
 T: 0.5
-p_cutoff: 0.95
+p_cutoff: 0.6
 ulb_loss_ratio: 1.0
 uratio: 7
 ema_m: 0.999
@@ -45,9 +45,4 @@ long_tail: True
 imb_ratio_lb: 100
 imb_ratio_ulb: 100
 labeled_percentage: 10
-e_cutoff: -8.75
-x1: 0.5
-y1: -7.5
-x2: 1.0
-y2: -20.0
-degree: 10
+e_cutoff: -9.5

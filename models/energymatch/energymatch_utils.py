@@ -21,7 +21,7 @@ def interpolation(x1, y1, x2, y2, k):
 
     return alpha, beta
 
-def consistency_loss(logits_s, logits_w, e_cutoff=-8.75, use_hard_labels=True):
+def consistency_loss(logits_s, logits_w, p_cutoff=0.95, e_cutoff=-8.75, use_hard_labels=True):
     logits_w = logits_w.detach()
 
     energy = -torch.logsumexp(logits_w, dim=1)
@@ -29,6 +29,10 @@ def consistency_loss(logits_s, logits_w, e_cutoff=-8.75, use_hard_labels=True):
 
     max_probs, max_idx = torch.max(pseudo_label, dim=-1)
     mask_raw = energy < e_cutoff
+
+    mask_cof = max_probs > p_cutoff
+
+    mask_raw = torch.logical_and(mask_raw, mask_cof)
 
     mask = mask_raw.float()
     select = max_probs[mask_raw]
