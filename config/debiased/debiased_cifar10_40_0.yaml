@@ -1,5 +1,5 @@
-save_dir: ./soar
-save_name: debiased_cifar10_40_2
+save_dir: ./holder
+save_name: debiased_cifar10_40_1_e8_holder8
 resume: False
 load_path: None
 overwrite: True
@@ -14,7 +14,7 @@ hard_label: True
 T: 0.5
 p_cutoff: 0.95
 ulb_loss_ratio: 1.0
-uratio: 7
+uratio: 9
 ema_m: 0.999
 optim: SGD
 lr: 0.03
@@ -33,7 +33,7 @@ train_sampler: RandomSampler
 num_classes: 10
 num_workers: 1
 alg: fixmatch
-seed: 2
+seed: 1
 world_size: 1
 rank: 0
 multiprocessing_distributed: False
@@ -41,7 +41,7 @@ dist_url: tcp://127.0.0.1:10006
 dist_backend: nccl
 gpu: 0
 tau: 0.5
-use_energy: False
+use_energy: True
 e_cutoff: -8
-use_debias: True
+use_debias: False
 use_marginal_loss: True

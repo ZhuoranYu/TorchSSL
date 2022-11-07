@@ -72,8 +72,6 @@ class Debiased:
 
         self.bn_controller = Bn_Controller()
 
-        self.qhat = (torch.ones([1, num_classes], dtype=torch.float)/num_classes).cuda()
-
     def set_data_loader(self, loader_dict):
         self.loader_dict = loader_dict
         self.print_fn(f'[!] data loader keys: {self.loader_dict.keys()}')
@@ -180,8 +178,9 @@ class Debiased:
         selected_label = selected_label.cuda(args.gpu)
 
         classwise_acc = torch.zeros((args.num_classes,)).cuda(args.gpu)
+        self.qhat = (torch.ones([1, args.num_classes], dtype=torch.float)/args.num_classes).cuda(args.gpu)
 
-        for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s, y_ulb) in zip(self.loader_dict['train_lb'],
+        for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s) in zip(self.loader_dict['train_lb'],
                                                                   self.loader_dict['train_ulb']):
 
             # prevent the training iterations exceed args.num_train_iter
@@ -197,7 +196,7 @@ class Debiased:
             assert num_ulb == x_ulb_s.shape[0]
 
             x_lb, x_ulb_w, x_ulb_s = x_lb.cuda(args.gpu), x_ulb_w.cuda(args.gpu), x_ulb_s.cuda(args.gpu)
-            y_lb, y_ulb = y_lb.cuda(args.gpu), y_ulb.cuda(args.gpu)
+            y_lb = y_lb.cuda(args.gpu)
 
             pseudo_counter = Counter(selected_label.tolist())
             if max(pseudo_counter.values()) < len(self.ulb_dset):  # not all(5w) -1
@@ -317,6 +316,7 @@ class Debiased:
         y_true = []
         y_pred = []
         y_logits = []
+        confusion_matrix = torch.zeros(self.num_classes, self.num_classes)
         for _, x, y in eval_loader:
             x, y = x.cuda(args.gpu), y.cuda(args.gpu)
             num_batch = x.shape[0]
@@ -327,6 +327,7 @@ class Debiased:
             y_pred.extend(torch.max(logits, dim=-1)[1].cpu().tolist())
             y_logits.extend(torch.softmax(logits, dim=-1).cpu().tolist())
             total_loss += loss.detach() * num_batch
+
         
         minority_cutoff = self.num_classes * 0.3
 
@@ -338,8 +339,10 @@ class Debiased:
         top1 = accuracy_score(y_true, y_pred)
         top5 = top_k_accuracy_score(y_true, y_logits, k=5)
 
-        cf_mat = confusion_matrix(y_true, y_pred, normalize='true')
-        self.print_fn('confusion matrix:\n' + np.array_str(cf_mat))
+        recall_cls = recall_score(y_true, y_pred, average=None)
+        top1 = np.mean(recall_cls)
+        self.print_fn(recall_cls)
+
         self.ema.restore()
         self.model.train()
         return {'eval/loss': total_loss / total_num, 'eval/top-1-acc': top1, 'eval/top-5-acc': top5, 'eval/minority-acc': minority_acc}

@@ -61,14 +61,23 @@ def default_loader(path):
 
 
 class ImagenetDataset(torchvision.datasets.ImageFolder):
-    def __init__(self, root, transform, ulb, num_labels=-1):
+    def __init__(self, root, transform, ulb, num_labels=-1, imb=False):
         super().__init__(root, transform)
         self.ulb = ulb
         self.num_labels = num_labels
+        self.imb = imb
         is_valid_file = None
         extensions = ('.jpg', '.jpeg', '.png', '.ppm', '.bmp', '.pgm', '.tif', '.tiff', '.webp')
+
+        if self.imb:
+            oldcls2newcls, newcls2idx = self._oldcls2newcls()
+        else:
+            oldcls2newcls = None
+            newcls2idx = None
+ 
+
         classes, class_to_idx = self._find_classes(self.root)
-        samples = self.make_dataset(self.root, class_to_idx, extensions, is_valid_file)
+        samples = self.make_dataset(self.root, num_labels, class_to_idx, extensions, is_valid_file, oldcls2newcls, newcls2idx)
         if len(samples) == 0:
             msg = "Found 0 files in subfolders of: {}\n".format(self.root)
             if extensions is not None:
@@ -82,6 +91,7 @@ class ImagenetDataset(torchvision.datasets.ImageFolder):
         self.class_to_idx = class_to_idx
         self.samples = samples
         self.targets = [s[1] for s in samples]
+
 
         if self.ulb:
             self.strong_transform = copy.deepcopy(transform)
@@ -97,12 +107,35 @@ class ImagenetDataset(torchvision.datasets.ImageFolder):
         return (index, sample_transformed, target) if not self.ulb else (
             index, sample_transformed, self.strong_transform(sample))
 
+    def _oldcls2newcls(self):
+        oldcls2newcls = {}
+        newcls = []
+        path = './imgname2folder.txt'
+        with open(path, 'r') as f:
+            txt = f.readlines()
+            for line in txt:
+                img_name, folder = line.strip().split(' ')
+                old_class = img_name[:-5].split('_')[0]
+                if oldcls2newcls.get(old_class) is None:
+                    oldcls2newcls[old_class] = folder
+                    if folder not in newcls:
+                        newcls.append(folder)
+
+        newcls_idx = {}
+        for idx, cls in enumerate(newcls):
+            newcls_idx[cls] = idx
+
+        return oldcls2newcls, newcls_idx
+
     def make_dataset(
             self,
             directory,
+            num_labels,
             class_to_idx,
             extensions=None,
             is_valid_file=None,
+            oldcls2newcls=None,
+            newcls2idx=None
     ):
         instances = []
         directory = os.path.expanduser(directory)
@@ -115,23 +148,53 @@ class ImagenetDataset(torchvision.datasets.ImageFolder):
                 return x.lower().endswith(extensions)
 
         lb_idx = {}
+        if not self.imb:
+            for target_class in sorted(class_to_idx.keys()):
+                class_index = class_to_idx[target_class]
+                target_dir = os.path.join(directory, target_class)
+                if not os.path.isdir(target_dir):
+                    continue
+                for root, _, fnames in sorted(os.walk(target_dir, followlinks=True)):
+                    random.shuffle(fnames)
+                    if num_labels != -1:
+                        fnames = fnames[:self.num_labels]
+                    if num_labels != -1:
+                        lb_idx[target_class] = fnames
+                    for fname in fnames:
+                        path = os.path.join(root, fname)
+                        if is_valid_file(path):
+                            item = path, class_index
+                            
+                            instances.append(item)
+        else:
+            # all all fnames together for general sampling
+            class_count = [0.] * 127
+            for old_class in sorted(class_to_idx.keys()):
+                old_class_index = class_to_idx[old_class]
+                target_dir = os.path.join(directory, old_class)
+                if not os.path.isdir(target_dir):
+                    continue
+                for root, _, fnames in sorted(os.walk(target_dir, followlinks=True)):
+                    for fname in fnames: # loop through all image files
+                        path = os.path.join(root, fname)
+                        if is_valid_file(path):
+                            newcls = oldcls2newcls[old_class]
+                            newcls_idx = newcls2idx[newcls]
+                            item = path, newcls_idx
+                            class_count[newcls_idx] += 1
 
-        for target_class in sorted(class_to_idx.keys()):
-            class_index = class_to_idx[target_class]
-            target_dir = os.path.join(directory, target_class)
-            if not os.path.isdir(target_dir):
-                continue
-            for root, _, fnames in sorted(os.walk(target_dir, followlinks=True)):
-                random.shuffle(fnames)
-                if self.num_labels != -1:
-                    fnames = fnames[:self.num_labels]
-                if self.num_labels != -1:
-                    lb_idx[target_class] = fnames
-                for fname in fnames:
-                    path = os.path.join(root, fname)
-                    if is_valid_file(path):
-                        item = path, class_index
-                        instances.append(item)
+                            assert newcls_idx >= 0 and newcls_idx <= 126
+                            
+                            instances.append(item)
+            print(max(class_count) / min(class_count))
+
+            if num_labels != -1:
+                random.shuffle(instances)
+                total_images = len(instances)
+                num_lb_example = int(0.1 * total_images)
+                instances = instances[:num_lb_example]
+
+
         if self.num_labels != -1:
             with open('./sampled_label_idx.json', 'w') as f:
                 json.dump(lb_idx, f)
@@ -143,7 +206,10 @@ class ImagenetDataset(torchvision.datasets.ImageFolder):
 class ImageNetLoader:
     def __init__(self, root_path, num_labels=-1, num_class=1000):
         self.root_path = os.path.join(root_path, 'imagenet')
+
         self.num_labels = num_labels // num_class
+
+        self.imb = num_class == 127
 
     def get_transform(self, train, ulb):
         if train:
@@ -163,17 +229,17 @@ class ImageNetLoader:
     def get_lb_train_data(self):
         transform = self.get_transform(train=True, ulb=False)
         data = ImagenetDataset(root=os.path.join(self.root_path, "train"), transform=transform, ulb=False,
-                               num_labels=self.num_labels)
+                               num_labels=self.num_labels, imb=self.imb)
         return data
 
     def get_ulb_train_data(self):
         transform = self.get_transform(train=True, ulb=True)
-        data = ImagenetDataset(root=os.path.join(self.root_path, "train"), transform=transform, ulb=True)
+        data = ImagenetDataset(root=os.path.join(self.root_path, "train"), transform=transform, ulb=True, imb=self.imb)
         return data
 
     def get_lb_test_data(self):
         transform = self.get_transform(train=False, ulb=False)
-        data = ImagenetDataset(root=os.path.join(self.root_path, "val"), transform=transform, ulb=False)
+        data = ImagenetDataset(root=os.path.join(self.root_path, "val"), transform=transform, ulb=False, imb=self.imb)
         return data
 
 
