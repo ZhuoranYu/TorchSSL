@@ -14,7 +14,6 @@ from train_utils import AverageMeter
 
 from .inpl_utils import consistency_loss, Get_Scalar
 from train_utils import ce_loss, wd_loss, EMA, Bn_Controller
-from analyze_utils import *
 
 from sklearn.metrics import *
 from copy import deepcopy
@@ -83,64 +82,6 @@ class InPL:
         self.optimizer = optimizer
         self.scheduler = scheduler
 
-    def save_energy_pseudo(self, dataset, scores_ulb, label_ulb, energy_ulb):
-        scores_ulb = torch.cat(scores_ulb, dim=0)
-        label_ulb = torch.cat(label_ulb, dim=0)
-        max_score, max_index = torch.max(scores_ulb, dim=-1)
-        incorrect_mask = (max_index != label_ulb)
-
-        pred_column = torch.zeros_like(label_ulb)  # to store correctness
-        pred_column[incorrect_mask] = 1  # incorrectly predicted as head
-        pred_column = pred_column
-
-        energy_ulb = torch.cat(energy_ulb, dim=0)
-
-        # from pseudo label's perspective
-        data = np.vstack([max_score.detach().cpu().numpy(), energy_ulb.detach().cpu().numpy(),
-                          pred_column.detach().cpu().numpy().astype(np.float)]).transpose()
-        df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-        os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
-        df.to_csv(f'{dataset}_track/{self.it // 1000}k/overall_pseudo.csv', index=False)
-        for c in range(self.num_classes):
-            c_mask = max_index == c
-            c_score = max_score[c_mask].detach().cpu().numpy()
-            c_energy = energy_ulb[c_mask].detach().cpu().numpy()
-            c_pred_column = pred_column[c_mask].detach().cpu().numpy().astype(np.float)
-
-            data = np.vstack([c_score, c_energy, c_pred_column]).transpose()
-            df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-            os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
-            df.to_csv(f'{dataset}_track/{self.it // 1000}k/class_{c}_pseudo.csv', index=False)
-
-    def save_energy_real(self, dataset, scores_ulb, label_ulb, energy_ulb):
-        scores_ulb = torch.cat(scores_ulb, dim=0)
-        label_ulb = torch.cat(label_ulb, dim=0)
-        max_score, max_index = torch.max(scores_ulb, dim=-1)
-        incorrect_mask = (max_index != label_ulb)
-
-        pred_column = torch.zeros_like(label_ulb)  # to store correctness
-        pred_column[incorrect_mask] = 1  # incorrectly predicted as head
-        pred_column = pred_column
-
-        energy_ulb = torch.cat(energy_ulb, dim=0)
-
-        # from real label's perspective
-        data = np.vstack([max_score.detach().cpu().numpy(), energy_ulb.detach().cpu().numpy(),
-                          pred_column.detach().cpu().numpy().astype(np.float)]).transpose()
-        df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-        os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
-        df.to_csv(f'{dataset}_track/{self.it // 1000}k/overall_real.csv', index=False)
-        for c in range(self.num_classes):
-            c_mask = label_ulb == c
-            c_score = max_score[c_mask].detach().cpu().numpy()
-            c_energy = energy_ulb[c_mask].detach().cpu().numpy()
-            c_pred_column = pred_column[c_mask].detach().cpu().numpy().astype(np.float)
-
-            data = np.vstack([c_score, c_energy, c_pred_column]).transpose()
-            df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-            os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
-            df.to_csv(f'{dataset}_track/{self.it // 1000}k/class_{c}_real.csv', index=False)
-
     def update_qhat(self, probs, momentum):
         mean_prob = probs.detach().mean(dim=0)
         self.qhat = momentum * self.qhat + (1 - momentum) * mean_prob
@@ -173,10 +114,6 @@ class InPL:
             eval_dict = self.evaluate(args=args)
             print(eval_dict)
 
-        selected_label = torch.ones((len(self.ulb_dset),), dtype=torch.long, ) * -1
-        selected_label = selected_label.cuda(args.gpu)
-
-        classwise_acc = torch.zeros((args.num_classes,)).cuda(args.gpu)
         self.qhat = (torch.ones([1, args.num_classes], dtype=torch.float) / args.num_classes).cuda(args.gpu)
 
         for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s) in zip(self.loader_dict['train_lb'],
@@ -196,11 +133,6 @@ class InPL:
 
             x_lb, x_ulb_w, x_ulb_s = x_lb.cuda(args.gpu), x_ulb_w.cuda(args.gpu), x_ulb_s.cuda(args.gpu)
             y_lb = y_lb.cuda(args.gpu)
-
-            pseudo_counter = Counter(selected_label.tolist())
-            if max(pseudo_counter.values()) < len(self.ulb_dset):  # not all(5w) -1
-                for i in range(args.num_classes):
-                    classwise_acc[i] = pseudo_counter[i] / max(pseudo_counter.values())
 
             inputs = torch.cat((x_lb, x_ulb_w, x_ulb_s))
 
