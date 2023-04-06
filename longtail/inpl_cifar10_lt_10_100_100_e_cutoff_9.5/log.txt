@@ -1,10 +1,10 @@
-[2023-03-30 20:28:39,259 WARNING] USE GPU: 0 for training
-[2023-03-30 20:28:39,333 INFO] Number of Trainable Params: 1469642
-[2023-03-30 20:28:40,872 INFO] model_arch: <models.inpl.inpl.InPL object at 0x7fa467d4b7c0>
-[2023-03-30 20:28:40,873 INFO] Arguments: Namespace(save_dir='./longtail', save_name='inpl_cifar10_lt_10_100_100_e_cutoff_9.5', resume=False, load_path='None', overwrite=True, use_tensorboard=True, epoch=1, num_train_iter=393216, num_eval_iter=1000, num_labels=40, batch_size=64, uratio=7, eval_batch_size=1024, hard_label=True, T=0.5, p_cutoff=0.95, ema_m=0.999, ulb_loss_ratio=1.0, optim='SGD', lr=0.03, momentum=0.9, weight_decay=0.0005, amp=False, clip=0, cycle=0, net='WideResNet', net_from_name=False, depth=28, widen_factor=2, leaky_slope=0.1, dropout=0.0, data_dir='./data', dataset='cifar10', train_sampler='RandomSampler', num_classes=10, num_workers=1, world_size=1, rank=0, dist_url='tcp://127.0.0.1:10006', dist_backend='nccl', seed=0, gpu=0, multiprocessing_distributed=False, long_tail=True, imb_ratio_lb=100, imb_ratio_ulb=100, labeled_percentage=10, e_cutoff=-9.5, tau=0.5, use_marginal_loss=False, qhat_m=0.999, c='config/inpl/inpl_cifar10_lt.yaml', alg='inpl', distributed=False, bn_momentum=0.0010000000000000009)
-[2023-03-30 20:28:42,837 INFO] [!] data loader keys: dict_keys(['train_lb', 'train_ulb', 'eval'])
-[2023-03-30 20:29:08,255 INFO] model saved: ./longtail/inpl_cifar10_lt_10_100_100_e_cutoff_9.5/latest_model.pth
-[2023-03-30 20:29:10,975 INFO] confusion matrix:
+[2023-04-05 22:56:45,152 WARNING] USE GPU: 0 for training
+[2023-04-05 22:56:45,211 INFO] Number of Trainable Params: 1469642
+[2023-04-05 22:56:46,085 INFO] model_arch: <models.v2.v2.InPLV2 object at 0x7f6b2e4f01c0>
+[2023-04-05 22:56:46,085 INFO] Arguments: Namespace(save_dir='./longtail', save_name='inpl_cifar10_lt_10_100_100_e_cutoff_9.5', resume=False, load_path='None', overwrite=True, use_tensorboard=True, epoch=1, num_train_iter=393216, num_eval_iter=1000, num_labels=40, batch_size=64, uratio=7, eval_batch_size=1024, hard_label=True, T=0.5, p_cutoff=0.95, ema_m=0.999, ulb_loss_ratio=1.0, optim='SGD', lr=0.03, momentum=0.9, weight_decay=0.0005, amp=False, clip=0, cycle=0, net='WideResNet', net_from_name=False, depth=28, widen_factor=2, leaky_slope=0.1, dropout=0.0, data_dir='./data', dataset='cifar10', train_sampler='RandomSampler', num_classes=10, num_workers=1, world_size=1, rank=0, dist_url='tcp://127.0.0.1:10006', dist_backend='nccl', seed=0, gpu=0, multiprocessing_distributed=False, long_tail=True, imb_ratio_lb=100, imb_ratio_ulb=100, labeled_percentage=10, loss_form='mse', sharpening=False, z_m=0.999, c='config/v2/v2_cifar10_lt.yaml', alg='inpl', distributed=False, bn_momentum=0.0010000000000000009)
+[2023-04-05 22:58:30,163 INFO] [!] data loader keys: dict_keys(['train_lb', 'train_ulb', 'eval'])
+[2023-04-05 22:58:38,860 INFO] model saved: ./longtail/inpl_cifar10_lt_10_100_100_e_cutoff_9.5/latest_model.pth
+[2023-04-05 22:58:41,618 INFO] confusion matrix:
 [[0.834 0.086 0.08  0.    0.    0.    0.    0.    0.    0.   ]
  [0.96  0.01  0.03  0.    0.    0.    0.    0.    0.    0.   ]
  [0.909 0.021 0.07  0.    0.    0.    0.    0.    0.    0.   ]
@@ -15,5 +15,5 @@
  [0.945 0.009 0.046 0.    0.    0.    0.    0.    0.    0.   ]
  [0.868 0.066 0.066 0.    0.    0.    0.    0.    0.    0.   ]
  [0.971 0.009 0.02  0.    0.    0.    0.    0.    0.    0.   ]]
-[2023-03-30 20:29:10,984 INFO] 0 iteration, USE_EMA: True, {'train/sup_loss': tensor(2.2206, device='cuda:0'), 'train/unsup_loss': tensor(0., device='cuda:0'), 'train/total_loss': tensor(2.2206, device='cuda:0'), 'train/mask_ratio': tensor(1., device='cuda:0'), 'lr': 0.03, 'train/prefecth_time': 0.9461166381835937, 'train/run_time': 24.3749296875, 'eval/loss': tensor(13.4939, device='cuda:0'), 'eval/top-1-acc': 0.0914, 'eval/top-5-acc': 0.5013, 'eval/precision': 0.02797290798353865, 'eval/recall': 0.0914, 'eval/F1': 0.027392383652764318, 'eval/AUC': 0.4857025555555555}, BEST_EVAL_ACC: 0.0914, at 0 iters
-[2023-03-30 20:29:11,066 INFO] model saved: ./longtail/inpl_cifar10_lt_10_100_100_e_cutoff_9.5/model_best.pth
+[2023-04-05 22:58:41,633 INFO] 0 iteration, USE_EMA: True, {'train/sup_loss': tensor(2.2206, device='cuda:0'), 'train/unsup_loss': tensor(0.0001, device='cuda:0'), 'train/total_loss': tensor(2.2206, device='cuda:0'), 'lr': 0.03, 'train/prefecth_time': 0.9714990844726562, 'train/run_time': 7.6112353515625, 'eval/loss': tensor(13.4939, device='cuda:0'), 'eval/top-1-acc': 0.0914, 'eval/top-5-acc': 0.5013, 'eval/precision': 0.02797290798353865, 'eval/recall': 0.0914, 'eval/F1': 0.027392383652764318, 'eval/AUC': 0.4857025555555555}, BEST_EVAL_ACC: 0.0914, at 0 iters
+[2023-04-05 22:58:41,719 INFO] model saved: ./longtail/inpl_cifar10_lt_10_100_100_e_cutoff_9.5/model_best.pth

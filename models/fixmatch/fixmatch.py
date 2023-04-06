@@ -14,7 +14,6 @@ from train_utils import AverageMeter
 
 from .fixmatch_utils import consistency_loss, Get_Scalar
 from train_utils import ce_loss, wd_loss, EMA, Bn_Controller
-from analyze_utils import *
 
 from sklearn.metrics import *
 from copy import deepcopy
@@ -83,64 +82,6 @@ class FixMatch:
         self.optimizer = optimizer
         self.scheduler = scheduler
 
-    def save_energy_pseudo(self, dataset, scores_ulb, label_ulb, energy_ulb):
-        scores_ulb = torch.cat(scores_ulb, dim=0)
-        label_ulb = torch.cat(label_ulb, dim=0)
-        max_score, max_index = torch.max(scores_ulb, dim=-1)
-        incorrect_mask = (max_index != label_ulb)
-
-        pred_column = torch.zeros_like(label_ulb)  # to store correctness
-        pred_column[incorrect_mask] = 1  # incorrectly predicted as head
-        pred_column = pred_column
-
-        energy_ulb = torch.cat(energy_ulb, dim=0)
-
-        # from pseudo label's perspective
-        data = np.vstack([max_score.detach().cpu().numpy(), energy_ulb.detach().cpu().numpy(),
-                          pred_column.detach().cpu().numpy().astype(np.float)]).transpose()
-        df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-        os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
-        df.to_csv(f'{dataset}_track/{self.it // 1000}k/overall_pseudo.csv', index=False)
-        for c in range(self.num_classes):
-            c_mask = max_index == c
-            c_score = max_score[c_mask].detach().cpu().numpy()
-            c_energy = energy_ulb[c_mask].detach().cpu().numpy()
-            c_pred_column = pred_column[c_mask].detach().cpu().numpy().astype(np.float)
-
-            data = np.vstack([c_score, c_energy, c_pred_column]).transpose()
-            df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-            os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
-            df.to_csv(f'{dataset}_track/{self.it // 1000}k/class_{c}_pseudo.csv', index=False)
-
-    def save_energy_real(self, dataset, scores_ulb, label_ulb, energy_ulb):
-        scores_ulb = torch.cat(scores_ulb, dim=0)
-        label_ulb = torch.cat(label_ulb, dim=0)
-        max_score, max_index = torch.max(scores_ulb, dim=-1)
-        incorrect_mask = (max_index != label_ulb)
-
-        pred_column = torch.zeros_like(label_ulb)  # to store correctness
-        pred_column[incorrect_mask] = 1  # incorrectly predicted as head
-        pred_column = pred_column
-
-        energy_ulb = torch.cat(energy_ulb, dim=0)
-
-        # from real label's perspective
-        data = np.vstack([max_score.detach().cpu().numpy(), energy_ulb.detach().cpu().numpy(),
-                          pred_column.detach().cpu().numpy().astype(np.float)]).transpose()
-        df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-        os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
-        df.to_csv(f'{dataset}_track/{self.it // 1000}k/overall_real.csv', index=False)
-        for c in range(self.num_classes):
-            c_mask = label_ulb == c
-            c_score = max_score[c_mask].detach().cpu().numpy()
-            c_energy = energy_ulb[c_mask].detach().cpu().numpy()
-            c_pred_column = pred_column[c_mask].detach().cpu().numpy().astype(np.float)
-
-            data = np.vstack([c_score, c_energy, c_pred_column]).transpose()
-            df = pd.DataFrame(data, columns=['score', 'energy', 'correct'])
-            os.makedirs(f'{dataset}_track/{self.it // 1000}k', exist_ok=True)
-            df.to_csv(f'{dataset}_track/{self.it // 1000}k/class_{c}_real.csv', index=False)
-
     def train(self, args, logger=None):
 
         ngpus_per_node = torch.cuda.device_count()
@@ -174,16 +115,9 @@ class FixMatch:
 
         classwise_acc = torch.zeros((args.num_classes,)).cuda(args.gpu)
 
-        scores_ulb = []
-        label_ulb = []
-        energy_ulb = []
-
-        pseudo_labels_acc = []
-        true_labels_acc = []
-        all_true_labels_acc = []
-
-        for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s, y_ulb) in zip(self.loader_dict['train_lb'],
+        for (_, x_lb, y_lb), (x_ulb_idx, x_ulb_w, x_ulb_s) in zip(self.loader_dict['train_lb'],
                                                                   self.loader_dict['train_ulb']):
+
 
             # prevent the training iterations exceed args.num_train_iter
             if self.it > args.num_train_iter:
@@ -198,7 +132,7 @@ class FixMatch:
             assert num_ulb == x_ulb_s.shape[0]
 
             x_lb, x_ulb_w, x_ulb_s = x_lb.cuda(args.gpu), x_ulb_w.cuda(args.gpu), x_ulb_s.cuda(args.gpu)
-            y_lb, y_ulb = y_lb.cuda(args.gpu), y_ulb.cuda(args.gpu)
+            y_lb = y_lb.cuda(args.gpu)
 
             pseudo_counter = Counter(selected_label.tolist())
             if max(pseudo_counter.values()) < len(self.ulb_dset):  # not all(5w) -1
@@ -218,26 +152,18 @@ class FixMatch:
                 T = self.t_fn(self.it)
                 p_cutoff = self.p_fn(self.it)
 
-                energy = -torch.logsumexp(logits_x_ulb_w, dim=1)
-                scores_ulb.append(F.softmax(logits_x_ulb_w, dim=-1).detach())
-                label_ulb.append(y_ulb)
-                energy_ulb.append(energy)
-
-                unsup_loss, mask, select, pseudo_lb, mask_raw = consistency_loss(logits_x_ulb_s,
+                unsup_loss, mask, select, pseudo_lb = consistency_loss(logits_x_ulb_s,
                                                                        logits_x_ulb_w,
                                                                        'ce', T, p_cutoff,
                                                                        use_hard_labels=args.hard_label)
 
                 total_loss = sup_loss + self.lambda_u * unsup_loss
 
-                pseudo_labels_acc.append(pseudo_lb[mask_raw])
-                true_labels_acc.append(y_ulb[mask_raw])
-                all_true_labels_acc.append(y_ulb)
-
             # parameter updates
             if args.amp:
                 scaler.scale(total_loss).backward()
                 if (args.clip > 0):
+                    scaler.unscale_(self.optimizer)
                     torch.nn.utils.clip_grad_norm_(self.model.parameters(), args.clip)
                 scaler.step(self.optimizer)
                 scaler.update()
@@ -271,36 +197,18 @@ class FixMatch:
                         (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
                     self.save_model('latest_model.pth', save_path)
 
-            if self.it % 5000 == 0:
-                self.save_energy_real(args.dataset, scores_ulb, label_ulb, energy_ulb)
-                self.save_energy_pseudo(args.dataset, scores_ulb, label_ulb, energy_ulb)
-
-            if self.it % 100 == 0:
-                scores_ulb = []
-                label_ulb = []
-                energy_ulb = []
-
             if self.it % self.num_eval_iter == 0:
                 eval_dict = self.evaluate(args=args)
                 tb_dict.update(eval_dict)
-
-                pr_dict = analyze_pseudo(pseudo_labels_acc, true_labels_acc, all_true_labels_acc, self.num_classes)
-
-                tb_dict.update(pr_dict)
-                pseudo_labels_acc = []
-                true_labels_acc = []
-                all_true_labels_acc = []
 
                 save_path = os.path.join(args.save_dir, args.save_name)
 
                 if tb_dict['eval/top-1-acc'] > best_eval_acc:
                     best_eval_acc = tb_dict['eval/top-1-acc']
                     best_it = self.it
-                    best_minority_acc = tb_dict['eval/minority-acc']
 
                 self.print_fn(
-                    f"{self.it} iteration, USE_EMA: {self.ema_m != 0}, {tb_dict}, BEST_EVAL_ACC: {best_eval_acc}, MINORITY_ACC: {best_minority_acc}, at {best_it} iters")
-                total_time = 0
+                    f"{self.it} iteration, USE_EMA: {self.ema_m != 0}, {tb_dict}, BEST_EVAL_ACC: {best_eval_acc}, at {best_it} iters")
 
                 if not args.multiprocessing_distributed or \
                         (args.multiprocessing_distributed and args.rank % ngpus_per_node == 0):
@@ -342,20 +250,19 @@ class FixMatch:
             y_pred.extend(torch.max(logits, dim=-1)[1].cpu().tolist())
             y_logits.extend(torch.softmax(logits, dim=-1).cpu().tolist())
             total_loss += loss.detach() * num_batch
-
-        minority_mask = torch.logical_or(torch.logical_or(torch.tensor(y_true) == 9, torch.tensor(y_true) == 8), torch.tensor(y_true) == 7)
-        y_mino = torch.tensor(y_true)[minority_mask].tolist()
-        pred_mino = torch.tensor(y_pred)[minority_mask].tolist()
-        minority_acc = accuracy_score(y_mino, pred_mino)
-
         top1 = accuracy_score(y_true, y_pred)
         top5 = top_k_accuracy_score(y_true, y_logits, k=5)
+        precision = precision_score(y_true, y_pred, average='macro')
+        recall = recall_score(y_true, y_pred, average='macro')
+        F1 = f1_score(y_true, y_pred, average='macro')
+        AUC = roc_auc_score(y_true, y_logits, multi_class='ovo')
 
         cf_mat = confusion_matrix(y_true, y_pred, normalize='true')
         self.print_fn('confusion matrix:\n' + np.array_str(cf_mat))
         self.ema.restore()
         self.model.train()
-        return {'eval/loss': total_loss / total_num, 'eval/top-1-acc': top1, 'eval/top-5-acc': top5, 'eval/minority-acc': minority_acc}
+        return {'eval/loss': total_loss / total_num, 'eval/top-1-acc': top1, 'eval/top-5-acc': top5,
+                'eval/precision': precision, 'eval/recall': recall, 'eval/F1': F1, 'eval/AUC': AUC}
 
     def save_model(self, save_name, save_path):
         save_filename = os.path.join(save_path, save_name)
@@ -369,7 +276,7 @@ class FixMatch:
         torch.save({'model': self.model.state_dict(),
                     'optimizer': self.optimizer.state_dict(),
                     'scheduler': self.scheduler.state_dict(),
-                    'it': self.it,
+                    'it': self.it + 1,
                     'ema_model': ema_model},
                    save_filename)
 
